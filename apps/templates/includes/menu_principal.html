@@ -30,8 +30,7 @@
         flex-shrink: 0;
     }
 
-    .menu-principal .navbar-brand-text,
-    .menu-principal .navbar-user-name {
+    .menu-principal .navbar-brand-text {
         min-width: 0;
         overflow-wrap: anywhere;
     }
@@ -81,7 +80,45 @@
     }
 
     .menu-principal .menu-user-area {
+        flex: 0 1 auto;
+        max-width: min(100%, 18rem);
         min-width: 0;
+    }
+
+    .menu-principal .navbar-user-name {
+        align-items: center;
+        display: flex;
+        flex: 1 1 auto;
+        line-height: 1.15;
+        max-width: 100%;
+        min-width: 0;
+        padding-bottom: 0.25rem;
+        padding-top: 0.25rem;
+        white-space: normal;
+    }
+
+    .menu-principal .navbar-user-name i {
+        align-self: center;
+        flex-shrink: 0;
+    }
+
+    .menu-principal .navbar-user-label {
+        display: -webkit-box;
+        line-height: 1.15;
+        max-height: 2.3em;
+        min-width: 0;
+        overflow: hidden;
+        overflow-wrap: break-word;
+        white-space: normal;
+        word-break: break-word;
+        -webkit-box-orient: vertical;
+        -webkit-line-clamp: 2;
+    }
+
+    .menu-principal .menu-user-area form,
+    .menu-principal .menu-user-area .btn {
+        flex-shrink: 0;
+        white-space: nowrap;
     }
 
     @media (max-width: 1399.98px) {
@@ -115,8 +152,14 @@
         .menu-principal .menu-user-area {
             align-items: stretch !important;
             border-top: 1px solid rgba(255, 255, 255, 0.18);
+            flex: 1 1 100%;
             margin-top: 0.75rem;
+            max-width: 100%;
             padding-top: 0.75rem;
+            width: 100%;
+        }
+
+        .menu-principal .navbar-user-name {
             width: 100%;
         }
 
@@ -128,11 +171,22 @@
 
     @media (min-width: 1400px) {
         .menu-principal .navbar-collapse {
+            align-items: center;
+            column-gap: 0.75rem;
+            flex-wrap: wrap;
             min-width: 0;
+            row-gap: 0.35rem;
         }
 
         .menu-principal .navbar-nav {
-            flex-wrap: nowrap;
+            flex: 1 1 42rem;
+            flex-wrap: wrap;
+            min-width: 0;
+            row-gap: 0.25rem;
+        }
+
+        .menu-principal .navbar-nav .nav-item {
+            flex: 0 1 auto;
             min-width: 0;
         }
 
@@ -141,7 +195,8 @@
         }
 
         .menu-principal .menu-user-area {
-            max-width: 18rem;
+            flex: 0 1 18rem;
+            margin-left: auto;
         }
     }
 
@@ -262,7 +317,7 @@
                 {% if user.is_authenticated %}
                     <span class="navbar-text navbar-user-name text-white">
                         <i class="fas fa-user-circle me-1"></i>
-                        {{ user.get_full_name|default:user.get_username }}
+                        <span class="navbar-user-label">{{ user.get_full_name|default:user.get_username }}</span>
                     </span>
                     <form method="post" action="{% url 'logout' %}" class="m-0">
                         {% csrf_token %}
