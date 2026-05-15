@@ -1,4 +1,4 @@
-from .utilitarios import *
+﻿from .utilitarios import *
 
 # ===== NOVAS VIEWS PARA CONTROLE DE FALTAS =====
 
@@ -87,7 +87,7 @@ def registrar_falta(request):
             messages.success(request, 'Registro salvo com sucesso!')
             return redirect('controle_faltas')
         except User.DoesNotExist:
-            messages.error(request, 'Professor nÃ£o encontrado!')
+            messages.error(request, 'Professor nÃƒÂ£o encontrado!')
         except Exception as e:
             messages.error(request, f'Erro ao salvar: {str(e)}')
         return redirect('controle_faltas')
@@ -104,7 +104,7 @@ def controle_faltas_alunos(request):
     mes = request.GET.get('mes', timezone.now().month)
     ano = request.GET.get('ano', timezone.now().year)
 
-    # Busca ocorrÃªncias do perÃ­odo
+    # Busca ocorrÃƒÂªncias do perÃƒÂ­odo
     faltas = RegistroFaltaAluno.objects.filter(
         data__month=mes,
         data__year=ano
@@ -120,7 +120,7 @@ def controle_faltas_alunos(request):
     return render(request, 'faltas/controle_faltas_alunos.html', context)
 
 # =============================================================================
-# EDITAR OCORRÃŠNCIA DE ALUNO
+# EDITAR OCORRÃƒÅ NCIA DE ALUNO
 # =============================================================================
 
 @user_passes_test(pertence_ao_grupo_equipe_diretiva, login_url='/')
@@ -130,7 +130,7 @@ def editar_ocorrencia_aluno(request, pk):
 
     if request.method == 'POST':
 
-        # ðŸ”§ 1. SALVA OS CAMPOS DA BUSCA ATIVA (VERSÃƒO ROBUSTA)
+        # Ã°Å¸â€Â§ 1. SALVA OS CAMPOS DA BUSCA ATIVA (VERSÃƒÆ’O ROBUSTA)
         responsavel = request.POST.get('responsavel_contatado', '').strip()
         alegado = request.POST.get('alegado_responsavel', '').strip()
         horario_raw = request.POST.get('horario_contato', '').strip()
@@ -148,30 +148,30 @@ def editar_ocorrencia_aluno(request, pk):
                 else:
                     ocorrencia.horario_contato = None
             except Exception as e:
-                print(f"Erro na conversÃ£o do horÃ¡rio: {e}")
+                print(f"Erro na conversÃƒÂ£o do horÃƒÂ¡rio: {e}")
                 ocorrencia.horario_contato = None
         else:
             ocorrencia.horario_contato = None
 
         ocorrencia.save()
 
-        # ðŸ”§ MARCA AUTOMATICAMENTE COMO BUSCA ATIVA REALIZADA
+        # Ã°Å¸â€Â§ MARCA AUTOMATICAMENTE COMO BUSCA ATIVA REALIZADA
         ocorrencia.busca_ativa_realizada = True
         ocorrencia.save(update_fields=['busca_ativa_realizada'])
 
-        # 2. Processa o restante do formulÃ¡rio
+        # 2. Processa o restante do formulÃƒÂ¡rio
         form = RegistroOcorrenciaForm(request.POST, instance=ocorrencia)
         if form.is_valid():
             form.save()
         else:
-            print("Erros do formulÃ¡rio:", form.errors)   # â† ADICIONE ESTA LINHA
+            print("Erros do formulÃƒÂ¡rio:", form.errors)   # Ã¢â€ Â ADICIONE ESTA LINHA
             # Tenta salvar pelo menos os campos importantes que vieram no POST
             if 'atendido_por' in request.POST:
                 ocorrencia.atendido_por = request.POST.get('atendido_por', '')
             if 'motivo_alegado' in request.POST:
                 ocorrencia.motivo_alegado = request.POST.get('motivo_alegado', '')
             ocorrencia.save(update_fields=['atendido_por', 'motivo_alegado'])
-            messages.warning(request, 'Busca Ativa salva, mas outros dados apresentaram erro. Verifique o formulÃ¡rio.')
+            messages.warning(request, 'Busca Ativa salva, mas outros dados apresentaram erro. Verifique o formulÃƒÂ¡rio.')
 
         # Redireciona de volta para a Busca Ativa
         url = '/busca-ativa/'
@@ -183,11 +183,11 @@ def editar_ocorrencia_aluno(request, pk):
         if request.GET.get('turma'):
             params.append(f'turma={request.GET.get("turma")}')
         if params:
-            url += '?' + '&'.join(params)   # â† aqui estava o erro (aspas no &)
+            url += '?' + '&'.join(params)   # Ã¢â€ Â aqui estava o erro (aspas no &)
         return redirect(url)
 
     else:
-        # GET: mostra o formulÃ¡rio
+        # GET: mostra o formulÃƒÂ¡rio
         form = RegistroOcorrenciaForm(instance=ocorrencia)
         form.fields['turma'].initial = ocorrencia.aluno.turma
         form.fields['numero_aluno'].initial = ocorrencia.aluno.numero
@@ -200,7 +200,7 @@ def editar_ocorrencia_aluno(request, pk):
     })
 
 # =============================================================================
-# EXCLUIR OCORRÃŠNCIA DE ALUNO
+# EXCLUIR OCORRÃƒÅ NCIA DE ALUNO
 # =============================================================================
 @login_required
 @user_passes_test(pertence_ao_grupo_equipe_diretiva, login_url='/')
@@ -208,7 +208,7 @@ def excluir_ocorrencia_aluno(request, pk):
     ocorrencia = get_object_or_404(RegistroOcorrenciaAluno, id=pk)
     if request.method == 'POST':
         ocorrencia.delete()
-        messages.success(request, 'OcorrÃªncia excluÃ­da com sucesso!')
+        messages.success(request, 'OcorrÃƒÂªncia excluÃƒÂ­da com sucesso!')
         return redirect('controle_faltas_alunos')
     return render(request, 'ocorrencias/confirmar_exclusao_ocorrencia.html', {'ocorrencia': ocorrencia})
 
@@ -254,7 +254,7 @@ def editar_falta(request, falta_id):
             messages.error(request, f'Erro ao atualizar: {str(e)}')
             return redirect('editar_falta', falta_id=falta.id)
 
-    # GET - exibe o formulÃ¡rio
+    # GET - exibe o formulÃƒÂ¡rio
     context = {
         'falta': falta,
         'professores': professores,
@@ -264,30 +264,30 @@ def editar_falta(request, falta_id):
     }
     return render(request, 'faltas/editar_falta.html', context)
 # =============================================================================
-# VIEWS PARA EXCLUSÃƒO DE REGISTROS DE FALTA
+# VIEWS PARA EXCLUSÃƒÆ’O DE REGISTROS DE FALTA
 # =============================================================================
 
 @login_required
 @user_passes_test(pertence_ao_grupo_equipe_diretiva, login_url='/')
 def excluir_falta(request, falta_id):
-    """Exclui um Ãºnico registro de falta."""
+    """Exclui um ÃƒÂºnico registro de falta."""
     falta = get_object_or_404(RegistroFalta, id=falta_id)
     falta.delete()
-    messages.success(request, 'Registro excluÃ­do com sucesso.')
+    messages.success(request, 'Registro excluÃƒÂ­do com sucesso.')
     return redirect('controle_faltas')
 
 
 @login_required
 @user_passes_test(pertence_ao_grupo_equipe_diretiva, login_url='/')
 def excluir_faltas_selecionadas(request):
-    """Exclui mÃºltiplos registros de falta enviados por POST."""
+    """Exclui mÃƒÂºltiplos registros de falta enviados por POST."""
     if request.method == 'POST':
         ids = request.POST.getlist('ids')
         if ids:
             RegistroFalta.objects.filter(id__in=ids).delete()
-            messages.success(request, f'{len(ids)} registro(s) excluÃ­do(s) com sucesso.')
+            messages.success(request, f'{len(ids)} registro(s) excluÃƒÂ­do(s) com sucesso.')
         else:
-            messages.warning(request, 'Nenhum registro selecionado para exclusÃ£o.')
+            messages.warning(request, 'Nenhum registro selecionado para exclusÃƒÂ£o.')
     return redirect('controle_faltas')
 
 # =============================================================================
@@ -331,16 +331,16 @@ def registrar_falta_aluno(request):
             pedagoga = request.POST.get('pedagoga_outra', '').strip()
 
         if not pedagoga:
-            messages.error(request, 'Selecione ou informe a pedagoga responsável.')
+            messages.error(request, 'Selecione ou informe a pedagoga responsÃ¡vel.')
             return redirect('registrar_falta_aluno')
 
         try:
             aluno = Aluno.objects.get(id=aluno_id)
             if RegistroFaltaAluno.objects.filter(aluno=aluno, data=data).exists():
-                messages.warning(request, 'Este aluno já possui falta registrada nesta data.')
+                messages.warning(request, 'Este aluno jÃ¡ possui falta registrada nesta data.')
                 return redirect('registrar_falta_aluno')
 
-            # ðŸ“ REGISTRA FALTA
+            # Ã°Å¸â€œÂ REGISTRA FALTA
             falta = RegistroFaltaAluno.objects.create(
                 aluno=aluno,
                 data=data,
@@ -352,30 +352,6 @@ def registrar_falta_aluno(request):
                 registrado_por=request.user
             )
 
-            # ðŸ“² ENVIO WHATSAPP
-            from apps.utils import enviar_whatsapp
-
-            mensagem = f"""ðŸ“¢ Aviso Escolar
-
-OlÃ¡, informamos que o aluno {aluno.nome} faltou no dia {data}.
-
-Quantidade de faltas: {quantidade}
-
-ColÃ©gio Estadual CÃ­vico-Militar Vereador Luiz Zanchim
-"""
-
-            # tenta pegar telefone do responsÃ¡vel
-            telefone = getattr(aluno, 'telefone_responsavel', None)
-
-            # fallback (caso o campo seja diferente)
-            if not telefone:
-                telefone = getattr(aluno, 'telefone', None)
-
-            if telefone:
-                enviar_whatsapp(telefone, mensagem)
-            else:
-                print(f"âš ï¸ Aluno {aluno.nome} sem telefone cadastrado")
-
             messages.success(request, f'Falta registrada para {aluno.nome}')
 
         except Exception as e:
@@ -383,7 +359,7 @@ ColÃ©gio Estadual CÃ­vico-Militar Vereador Luiz Zanchim
 
         return redirect('registrar_falta_aluno')
 
-    # GET - exibe formulÃ¡rio
+    # GET - exibe formulÃƒÂ¡rio
     turmas = Turma.objects.filter(ativa=True).order_by('turno', 'nome')
     alunos = Aluno.objects.filter(ativo=True).select_related('turma').order_by('turma__nome', 'numero')
     contexto = {
@@ -537,7 +513,7 @@ def justificar_faltas_alunos(request):
         data_justificativa = request.POST.get('data_justificativa')
 
         if not justificativa or not responsavel or not data_justificativa:
-            messages.error(request, 'Informe justificativa, responsável e data da justificativa.')
+            messages.error(request, 'Informe justificativa, responsÃ¡vel e data da justificativa.')
             return redirect('justificar_faltas_alunos')
 
         falta.justificada = True
@@ -611,14 +587,14 @@ def editar_falta_aluno(request, falta_id):
 def excluir_falta_aluno(request, falta_id):
     falta = get_object_or_404(RegistroFaltaAluno, id=falta_id)
     falta.delete()
-    messages.success(request, 'Registro excluÃ­do!')
+    messages.success(request, 'Registro excluÃƒÂ­do!')
     return redirect('controle_faltas_alunos')
 
 @ocorrencias_required
 def registrar_ocorrencia_aluno(request):
     tipos_ocorrencia_permitidos = {'atraso', 'piercing', 'cabelo', 'uniforme', 'desvio_normas'}
 
-    # Recupera Ãºltima data da sessÃ£o
+    # Recupera ÃƒÂºltima data da sessÃƒÂ£o
     ultima_data_str = request.session.get('ultima_data_ocorrencia')
     if ultima_data_str:
         try:
@@ -628,7 +604,7 @@ def registrar_ocorrencia_aluno(request):
     else:
         ultima_data = timezone.now().date()
 
-    # Recupera Ãºltima turma da sessÃ£o
+    # Recupera ÃƒÂºltima turma da sessÃƒÂ£o
     ultima_turma_id = request.session.get('ultima_turma_ocorrencia_id')
     ultima_turma = None
     if ultima_turma_id:
@@ -643,7 +619,7 @@ def registrar_ocorrencia_aluno(request):
             pedagoga = request.POST.get('pedagoga_outra', '').strip()
 
         if not pedagoga:
-            messages.error(request, 'Selecione ou informe a pedagoga responsável.')
+            messages.error(request, 'Selecione ou informe a pedagoga responsÃ¡vel.')
             return redirect('registrar_ocorrencia_aluno')
 
         form = RegistroOcorrenciaForm(request.POST)
@@ -653,7 +629,7 @@ def registrar_ocorrencia_aluno(request):
 
             aluno = Aluno.objects.filter(turma=turma, numero=numero).first()
             if not aluno:
-                messages.error(request, f'Aluno nÃºmero {numero} nÃ£o encontrado na turma {turma.nome}!')
+                messages.error(request, f'Aluno nÃƒÂºmero {numero} nÃƒÂ£o encontrado na turma {turma.nome}!')
                 contexto = {
                     'form': form,
                     'ultimas_ocorrencias': RegistroOcorrenciaAluno.objects.select_related('aluno', 'aluno__turma').order_by('-data', '-horario_chegada')[:10]
@@ -696,17 +672,17 @@ def registrar_ocorrencia_aluno(request):
             return redirect('registrar_ocorrencia_aluno')
 
     else:
-        # ===== RECUPERA O ÃšLTIMO TIPO E TURNO DA SESSÃƒO =====
+        # ===== RECUPERA O ÃƒÅ¡LTIMO TIPO E TURNO DA SESSÃƒÆ’O =====
         ultimo_tipo = request.session.get('ultimo_tipo_ocorrencia', 'atraso')
         if ultimo_tipo not in tipos_ocorrencia_permitidos:
             ultimo_tipo = 'atraso'
-        ultimo_turno = request.session.get('ultimo_turno', 'manha')  # â† NOVO
+        ultimo_turno = request.session.get('ultimo_turno', 'manha')  # Ã¢â€ Â NOVO
 
         initial_data = {
             'data': ultima_data.isoformat(),
             'faltou': False,
             'tipo_ocorrencia': ultimo_tipo,
-            'turno': ultimo_turno,  # â† NOVO
+            'turno': ultimo_turno,  # Ã¢â€ Â NOVO
         }
         form = RegistroOcorrenciaForm(initial=initial_data)
         if ultima_turma:
@@ -737,12 +713,12 @@ def buscar_aluno_ajax(request):
         except (Turma.DoesNotExist, Aluno.DoesNotExist):
             return JsonResponse({
                 'encontrado': False,
-                'erro': 'Aluno nÃ£o encontrado nesta turma.'
+                'erro': 'Aluno nÃƒÂ£o encontrado nesta turma.'
             })
-    return JsonResponse({'encontrado': False, 'erro': 'Informe turma e nÃºmero.'})
+    return JsonResponse({'encontrado': False, 'erro': 'Informe turma e nÃƒÂºmero.'})
 
 # =============================================================================
-# BUSCA ATIVA - GESTÃƒO DE FALTAS PENDENTES
+# BUSCA ATIVA - GESTÃƒÆ’O DE FALTAS PENDENTES
 # =============================================================================
 
 @login_required
@@ -753,7 +729,7 @@ def busca_ativa(request):
     ano = int(request.GET.get('ano', timezone.now().year))
     turma_id = request.GET.get('turma')
 
-    # Busca TODAS as ocorrÃªncias (sem filtro faltou=True)
+    # Busca TODAS as ocorrÃƒÂªncias (sem filtro faltou=True)
     ocorrencias = RegistroOcorrenciaAluno.objects.filter(
         data__year=ano,
         data__month=mes
@@ -796,9 +772,9 @@ def marcar_busca_ativa(request, pk):
     ocorrencia = get_object_or_404(RegistroOcorrenciaAluno, id=pk)
     ocorrencia.busca_ativa_realizada = True
     ocorrencia.save()
-    messages.success(request, f'âœ… Busca ativa marcada para {ocorrencia.aluno.nome}')
+    messages.success(request, f'Ã¢Å“â€¦ Busca ativa marcada para {ocorrencia.aluno.nome}')
 
-    # Pegar os parÃ¢metros da URL para manter os filtros
+    # Pegar os parÃƒÂ¢metros da URL para manter os filtros
     mes = request.GET.get('mes', '')
     ano = request.GET.get('ano', '')
     turma_id = request.GET.get('turma', '')
@@ -836,6 +812,6 @@ def marcar_todos_busca_ativa(request):
             ocorrencias = ocorrencias.filter(aluno__turma_id=turma_id)
 
         quantidade = ocorrencias.update(busca_ativa_realizada=True)
-        messages.success(request, f'âœ… {quantidade} ocorrÃªncia(s) marcada(s) como busca ativa realizada!')
+        messages.success(request, f'Ã¢Å“â€¦ {quantidade} ocorrÃƒÂªncia(s) marcada(s) como busca ativa realizada!')
 
     return redirect('busca_ativa')

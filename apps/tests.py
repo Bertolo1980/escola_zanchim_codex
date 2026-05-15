@@ -1,10 +1,11 @@
 from datetime import date
 
 from django.contrib.auth.models import Group, User
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.urls import reverse
 
 from .models import Aluno, RegistroFaltaAluno, RegistroOcorrenciaAluno, Turma
+from .services.whatsapp_service import enviar_mensagem_whatsapp, formatar_numero_whatsapp
 
 
 class FaltasOcorrenciasSeparacaoTests(TestCase):
@@ -97,3 +98,16 @@ class FaltasOcorrenciasSeparacaoTests(TestCase):
                 data=ocorrencia.data,
             ).exists()
         )
+
+
+class WhatsAppServiceTests(TestCase):
+    def test_formatar_numero_whatsapp_adiciona_codigo_do_brasil(self):
+        self.assertEqual(formatar_numero_whatsapp('(44) 99999-0000'), '5544999990000')
+
+    @override_settings(WHATSAPP_TOKEN='', PHONE_NUMBER_ID='')
+    def test_enviar_mensagem_whatsapp_sem_configuracao_retorna_erro_controlado(self):
+        resultado = enviar_mensagem_whatsapp('(44) 99999-0000', 'Mensagem de teste')
+
+        self.assertFalse(resultado['status'])
+        self.assertEqual(resultado['numero'], '5544999990000')
+        self.assertIn('WHATSAPP_TOKEN', resultado['erro'])
