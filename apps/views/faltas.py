@@ -349,16 +349,16 @@ def registrar_falta_aluno(request):
             pedagoga = request.POST.get('pedagoga_outra', '').strip()
 
         if not pedagoga:
-            messages.error(request, 'Selecione ou informe a pedagoga responsÃ¡vel.')
+            messages.error(request, 'Selecione ou informe a pedagoga responsavel.')
             return redirect('registrar_falta_aluno')
 
         try:
             aluno = Aluno.objects.get(id=aluno_id)
             if RegistroFaltaAluno.objects.filter(aluno=aluno, data=data).exists():
-                messages.warning(request, 'Este aluno jÃ¡ possui falta registrada nesta data.')
+                messages.warning(request, 'Este aluno ja possui falta registrada nesta data.')
                 return redirect('registrar_falta_aluno')
 
-            # Ã°Å¸â€œÂ REGISTRA FALTA
+            # Registra falta
             falta = RegistroFaltaAluno.objects.create(
                 aluno=aluno,
                 data=data,
@@ -371,7 +371,7 @@ def registrar_falta_aluno(request):
             )
 
             if possui_atestado:
-                messages.success(request, 'Falta registrada com atestado e sem envio de aviso.')
+                messages.success(request, 'Falta registrada com atestado. WhatsApp nao enviado.')
                 return redirect('registrar_falta_aluno')
 
             telefone = _telefone_whatsapp_aluno(aluno)
@@ -384,7 +384,7 @@ def registrar_falta_aluno(request):
                         'data_falta': str(falta.data),
                     },
                 )
-                messages.warning(request, 'Falta registrada, mas não há telefone cadastrado para envio do WhatsApp.')
+                messages.warning(request, 'Falta registrada, mas nao ha telefone cadastrado para envio.')
                 return redirect('registrar_falta_aluno')
 
             try:
@@ -409,7 +409,7 @@ def registrar_falta_aluno(request):
                         'status_code_whatsapp': resultado_whatsapp.get('status_code'),
                     },
                 )
-                messages.warning(request, 'Falta registrada, mas a mensagem não foi enviada. Confira o número do responsável.')
+                messages.warning(request, 'Falta registrada, mas o aviso nao foi enviado. Confira o numero do responsavel.')
 
         except Exception as e:
             messages.error(request, f'Erro: {str(e)}')

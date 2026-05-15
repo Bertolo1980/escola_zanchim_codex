@@ -124,7 +124,7 @@ class FaltasOcorrenciasSeparacaoTests(TestCase):
         falta = RegistroFaltaAluno.objects.get(aluno=self.aluno)
         self.assertTrue(falta.justificada)
         enviar_mock.assert_not_called()
-        self.assertContains(response, 'Falta registrada com atestado e sem envio de aviso.')
+        self.assertContains(response, 'Falta registrada com atestado. WhatsApp nao enviado.')
 
     @patch('apps.views.faltas.enviar_template_aviso_falta_aluno')
     def test_falta_sem_telefone_salva_e_registra_alerta_sem_envio(self, enviar_mock):
@@ -134,6 +134,7 @@ class FaltasOcorrenciasSeparacaoTests(TestCase):
         self.assertTrue(RegistroFaltaAluno.objects.filter(aluno=self.aluno).exists())
         enviar_mock.assert_not_called()
         self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Falta registrada, mas nao ha telefone cadastrado para envio.')
         self.assertIn('aluno sem telefone cadastrado', '\n'.join(logs.output))
 
     def test_telefone_whatsapp_usa_telefone_quando_responsavel_vazio(self):
@@ -161,7 +162,7 @@ class FaltasOcorrenciasSeparacaoTests(TestCase):
         self.assertEqual(enviar_mock.call_args.args[0], '(44) 99999-0000')
         self.assertEqual(enviar_mock.call_args.args[1], self.aluno.nome)
         self.assertEqual(enviar_mock.call_args.args[2], '15/05/2026')
-        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Falta registrada, mas o aviso nao foi enviado. Confira o numero do responsavel.')
         self.assertIn('envio de WhatsApp falhou', '\n'.join(logs.output))
 
     @patch('apps.views.faltas.enviar_template_aviso_falta_aluno')
