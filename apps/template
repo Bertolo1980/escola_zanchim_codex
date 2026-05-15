@@ -1,0 +1,92 @@
+{% extends "admin/base.html" %}
+
+{% block branding %}
+<h1 id="site-name">
+    <a href="{% url 'admin:index' %}">🔴🔵 SE ISSO APARECER, O ARQUIVO ESTÁ SENDO LIDO! 🔵🔴</a>
+</h1>
+{% endblock %}
+
+{# BOTÕES NO TOPO #}
+{% block user-tools %}
+    <div style="display: flex; gap: 10px; align-items: center; margin-right: 15px;">
+        <!-- BOTÃO VERMELHO - ADMIN DJANGO -->
+        <a href="{% url 'admin:index' %}"
+           style="background-color: #dc3545; color: white; padding: 5px 12px;
+                  text-decoration: none; border-radius: 4px; font-weight: bold;
+                  font-size: 13px; border: 1px solid #bd2130;">
+            🔴 ADMIN
+        </a>
+
+        <!-- BOTÃO AZUL - PAINEL DA EQUIPE -->
+        <a href="/painel-equipe/"
+           style="background-color: #007bff; color: white; padding: 5px 12px;
+                  text-decoration: none; border-radius: 4px; font-weight: bold;
+                  font-size: 13px; border: 1px solid #0062cc;">
+            🔵 PAINEL DA EQUIPE
+        </a>
+    </div>
+    {{ block.super }}
+{% endblock %}
+
+<!-- ===== BOTÕES FIXOS NO RODAPÉ ===== -->
+<div style="position: fixed; bottom: 20px; right: 20px; z-index: 9999; display: flex; gap: 10px;">
+    <!-- BOTÃO VERMELHO (ADMIN) -->
+    <a href="{% url 'admin:index' %}"
+       style="background-color: #dc3545; color: white; padding: 6px 14px;
+              text-decoration: none; border-radius: 20px; font-weight: bold;
+              font-size: 13px; opacity: 0.9; box-shadow: 0 2px 5px rgba(0,0,0,0.2);">
+        ⬅️ ADMIN
+    </a>
+
+    <!-- BOTÃO AZUL - PAINEL DA EQUIPE -->
+    <a href="/painel-equipe/"
+       style="background-color: #007bff; color: white; padding: 6px 14px;
+              text-decoration: none; border-radius: 20px; font-weight: bold;
+              font-size: 13px; opacity: 0.9; box-shadow: 0 2px 5px rgba(0,0,0,0.2);">
+        🏠 PAINEL DA EQUIPE
+    </a>
+</div>
+
+<script>
+window.onload = function() {
+    var div = document.createElement('div');
+    div.style.position = 'fixed';
+    div.style.bottom = '20px';
+    div.style.right = '20px';
+    div.style.zIndex = '9999';
+    div.style.display = 'flex';
+    div.style.gap = '10px';
+
+    var btnAdmin = document.createElement('a');
+    btnAdmin.href = '/admin/';
+    btnAdmin.innerHTML = '⬅️ ADMIN';
+    btnAdmin.style.backgroundColor = '#dc3545';
+    btnAdmin.style.color = 'white';
+    btnAdmin.style.padding = '6px 14px';
+    btnAdmin.style.textDecoration = 'none';
+    btnAdmin.style.borderRadius = '20px';
+    btnAdmin.style.fontWeight = 'bold';
+    btnAdmin.style.fontSize = '13px';
+    btnAdmin.style.opacity = '0.9';
+    btnAdmin.style.boxShadow = '0 2px 5px rgba(0,0,0,0.2)';
+
+    var btnEquipe = document.createElement('a');
+    btnEquipe.href = '/painel-equipe/';
+    btnEquipe.innerHTML = '🏠 PAINEL DA EQUIPE';
+    btnEquipe.style.backgroundColor = '#007bff';
+    btnEquipe.style.color = 'white';
+    btnEquipe.style.padding = '6px 14px';
+    btnEquipe.style.textDecoration = 'none';
+    btnEquipe.style.borderRadius = '20px';
+    btnEquipe.style.fontWeight = 'bold';
+    btnEquipe.style.fontSize = '13px';
+    btnEquipe.style.opacity = '0.9';
+    btnEquipe.style.boxShadow = '0 2px 5px rgba(0,0,0,0.2)';
+
+    div.appendChild(btnAdmin);
+    div.appendChild(btnEquipe);
+    document.body.appendChild(div);
+};
+</script>
+
+{% endblock %}

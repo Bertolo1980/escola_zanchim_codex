@@ -1,0 +1,64 @@
+{% extends 'base.html' %}
+{% block title %}Laboratórios{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-2 px-md-4 py-3">
+    <div class="card">
+        <div class="card-header bg-primary text-white">
+            <h4><i class="fas fa-laptop me-2"></i>Gestão de Laboratórios</h4>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                {% for lab in laboratorios %}
+                <div class="col-md-6 mb-4">
+                    <div class="card h-100">
+                        <div class="card-header bg-secondary text-white">
+                            <h5>{{ lab.nome }} - {{ lab.equipamento }}</h5>
+                        </div>
+                        <div class="card-body">
+                            <p><strong>Tipo:</strong> 
+                                {% if lab.tipo == 'fixo' %}
+                                    <span class="badge bg-primary">Fixo - Turma inteira</span>
+                                {% else %}
+                                    <span class="badge bg-success">Itinerante - Equipamentos avulsos</span>
+                                {% endif %}
+                            </p>
+                            
+                            {% if lab.tipo == 'fixo' %}
+                                <p><strong>Capacidade:</strong> 1 turma (até 35 alunos)</p>
+                                <a href="{% url 'agendamento_lab' lab.id %}" class="btn btn-primary">
+                                    <i class="fas fa-calendar-plus"></i> Agendar Laboratório
+                                </a>
+                            {% else %}
+                                <p><strong>Quantidade total:</strong> {{ lab.quantidade_total }} equipamentos</p>
+                                <p><strong>Disponíveis:</strong> 
+                                    <span class="badge bg-success">{{ lab.disponiveis }}</span>
+                                </p>
+                                <a href="{% url 'emprestimo_equipamento' lab.id %}" class="btn btn-success">
+                                    <i class="fas fa-hand-holding"></i> Solicitar Empréstimo
+                                </a>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            
+            <hr>
+            
+            <div class="row mt-3">
+                <div class="col-md-6">
+                    <a href="{% url 'cronograma_semanal' %}" class="btn btn-info w-100">
+                        <i class="fas fa-calendar-alt"></i> Ver Cronograma Semanal
+                    </a>
+                </div>
+                <div class="col-md-6">
+                    <a href="{% url 'listar_emprestimos' %}" class="btn btn-warning w-100">
+                        <i class="fas fa-list"></i> Ver Empréstimos Ativos
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

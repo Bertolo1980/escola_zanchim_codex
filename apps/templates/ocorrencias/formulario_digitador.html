@@ -1,0 +1,212 @@
+{% extends 'base.html' %}
+{% block title %}Registrar Ocorrência{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-2 px-md-4 py-3">
+    <div class="card">
+        <div class="card-header bg-primary text-white">
+            <h4><i class="fas fa-clipboard-list me-2"></i>Registrar Ocorrência de Aluno</h4>
+        </div>
+        <div class="card-body">
+            {% if messages %}
+                {% for message in messages %}
+                    <div class="alert alert-{{ message.tags }} alert-dismissible fade show">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+
+            <form method="post" id="ocorrenciaForm">
+                {% csrf_token %}
+
+                <!-- Turma -->
+                <div class="mb-3">
+                    <label class="form-label fw-bold">{{ form.turma.label }}</label>
+                    {{ form.turma }}
+                </div>
+
+                <!-- Número do Aluno -->
+                <div class="mb-3">
+                    <label class="form-label fw-bold">{{ form.numero_aluno.label }}</label>
+                    {{ form.numero_aluno }}
+                </div>
+
+                <!-- Nome do Aluno (só leitura) -->
+                <div class="mb-3">
+                    <label class="form-label fw-bold">{{ form.nome_aluno.label }}</label>
+                    {{ form.nome_aluno }}
+                    <div id="aluno-status" class="mt-2"></div>
+                </div>
+
+                <!-- Data -->
+                <div class="mb-3">
+                    <label class="form-label fw-bold">{{ form.data.label }}</label>
+                    {{ form.data }}
+                </div>
+
+                <!-- TIPO DE OCORRÊNCIA (NOVO) -->
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Tipo de Ocorrência</label>
+                    <select name="tipo_ocorrencia" class="form-select" required>
+                        <option value="falta">❌ Falta</option>
+                        <option value="atraso">⏰ Atraso</option>
+                        <option value="uniforme">👕 Uniforme</option>
+                        <option value="piercing">💍 Piercing</option>
+                        <option value="cabelo">💇 Cabelo</option>
+                        <option value="desvio_normas">⚠️ Desvio de Normas</option>
+                    </select>
+                </div>
+
+                <!-- TURNO (NOVO) -->
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Turno</label>
+                    <select name="turno" class="form-select" required>
+                        <option value="manha">🌅 Manhã</option>
+                        <option value="tarde">🌇 Tarde</option>
+                    </select>
+                </div>
+
+                <!-- Horário de Chegada -->
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Horário de Chegada (opcional)</label>
+                    <input type="time" name="horario_chegada" class="form-control" step="60">
+                </div>
+
+                <!-- Atendido por -->
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Atendido por</label>
+                    <input type="text" name="atendido_por" class="form-control" placeholder="Quem atendeu o aluno?">
+                </div>
+
+                <!-- Motivo Alegado (aluno) -->
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Motivo Alegado (aluno)</label>
+                    <textarea name="motivo_alegado" class="form-control" rows="2" placeholder="O que o aluno disse?"></textarea>
+                </div>
+
+                <!-- Responsável Contatado -->
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Responsável Contatado</label>
+                    <input type="text" name="responsavel_contatado" class="form-control" placeholder="Nome do responsável">
+                </div>
+
+                <!-- Horário do Contato -->
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Horário do Contato</label>
+                    <input type="time" name="horario_contato" class="form-control" step="60">
+                </div>
+
+                <!-- Alegado pelo Responsável -->
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Alegado pelo Responsável</label>
+                    <textarea name="alegado_responsavel" class="form-control" rows="2" placeholder="O que o responsável disse?"></textarea>
+                </div>
+
+                <!-- Observações Adicionais -->
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Observações Adicionais</label>
+                    <textarea name="observacoes_adicionais" class="form-control" rows="2" placeholder="Informações extras"></textarea>
+                </div>
+
+                <!-- Botões -->
+                <div class="mt-4 d-flex justify-content-between">
+                    <button type="submit" class="btn btn-success">
+                        <i class="fas fa-save me-2"></i> Registrar Ocorrência
+                    </button>
+                    <form method="post" action="{% url 'logout' %}" style="display: inline;">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-danger">
+                            <i class="fas fa-sign-out-alt me-2"></i> Sair
+                        </button>
+                    </form>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Últimas Ocorrências -->
+    <div class="card mt-4">
+        <div class="card-header bg-secondary text-white">
+            <h5><i class="fas fa-history me-2"></i>Últimas Ocorrências Registradas</h5>
+        </div>
+        <div class="card-body">
+            {% if ultimas_ocorrencias %}
+                <div class="table-responsive">
+                    <table class="table table-sm table-hover">
+                        <thead>
+                            <tr>
+                                <th>Data</th>
+                                <th>Turma</th>
+                                <th>Nº</th>
+                                <th>Aluno</th>
+                                <th>Tipo</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for occ in ultimas_ocorrencias %}
+                            <tr>
+                                <td>{{ occ.data|date:"d/m" }}</td>
+                                <td>{{ occ.aluno.turma.nome }}</td>
+                                <td>{{ occ.aluno.numero }}</td>
+                                <td>{{ occ.aluno.nome|truncatechars:20 }}</td>
+                                <td>{{ occ.get_tipo_ocorrencia_display|truncatechars:12 }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <p class="text-muted text-center mb-0">Nenhuma ocorrência registrada ainda.</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const turmaSelect = document.getElementById('id_turma');
+    const numeroInput = document.getElementById('id_numero_aluno');
+    const nomeInput = document.getElementById('id_nome_aluno');
+    const statusDiv = document.getElementById('aluno-status');
+    const form = document.getElementById('ocorrenciaForm');
+
+    function buscarAluno() {
+        const turmaId = turmaSelect.value;
+        const numero = numeroInput.value.trim();
+
+        if (turmaId && numero) {
+            fetch(`/ocorrencias/buscar-aluno/?turma_id=${turmaId}&numero=${numero}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.encontrado) {
+                        nomeInput.value = data.nome;
+                        statusDiv.innerHTML = '<div class="alert alert-success py-1">✅ Aluno encontrado!</div>';
+                    } else {
+                        nomeInput.value = '';
+                        statusDiv.innerHTML = '<div class="alert alert-danger py-1">❌ ' + data.erro + '</div>';
+                    }
+                })
+                .catch(error => {
+                    nomeInput.value = '';
+                    statusDiv.innerHTML = '<div class="alert alert-danger py-1">⚠️ Erro na busca</div>';
+                });
+        } else {
+            nomeInput.value = '';
+            statusDiv.innerHTML = '';
+        }
+    }
+
+    turmaSelect.addEventListener('change', buscarAluno);
+    numeroInput.addEventListener('input', buscarAluno);
+    numeroInput.focus();
+
+    numeroInput.addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            form.submit();
+        }
+    });
+});
+</script>
+{% endblock %}

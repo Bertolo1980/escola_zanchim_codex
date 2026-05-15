@@ -1,0 +1,85 @@
+{% extends 'base.html' %}
+{% block title %}Agendar {{ laboratorio.nome }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-2 px-md-4 py-3">
+    <div class="card">
+        <div class="card-header bg-primary text-white">
+            <h4><i class="fas fa-calendar-plus"></i> Agendar {{ laboratorio.nome }} - {{ laboratorio.equipamento }}</h4>
+        </div>
+        <div class="card-body">
+            <form method="post">
+                {% csrf_token %}
+                
+                <div class="row mb-3">
+                    <div class="col-md-4">
+                        <label class="form-label fw-bold">Data</label>
+                        <input type="date" name="data" class="form-control" required>
+                    </div>
+                    
+                    <div class="col-md-4">
+                        <label class="form-label fw-bold">Turno</label>
+                        <select name="turno" class="form-select" required>
+                            <option value="manha">Manhã</option>
+                            <option value="tarde">Tarde</option>
+                        </select>
+                    </div>
+                    
+                    <div class="col-md-4">
+                        <label class="form-label fw-bold">Horário</label>
+                        <select name="horario" class="form-select" required>
+                            <option value="1">1ª Aula</option>
+                            <option value="2">2ª Aula</option>
+                            <option value="3">3ª Aula</option>
+                            <option value="4">4ª Aula</option>
+                            <option value="5">5ª Aula</option>
+                            <option value="6">6ª Aula</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold">Professor</label>
+                        <select name="professor" class="form-select" required>
+                            <option value="">Selecione...</option>
+                            {% for p in professores %}
+                            <option value="{{ p.id }}">{{ p.nome_completo }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold">Turma</label>
+                        <select name="turma" class="form-select" required>
+                            <option value="">Selecione...</option>
+                            {% for t in turmas %}
+                            <option value="{{ t.id }}">{{ t.nome }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Disciplina</label>
+                    <input type="text" name="disciplina" class="form-control" required>
+                </div>
+                
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Observação</label>
+                    <textarea name="observacao" class="form-control" rows="3"></textarea>
+                </div>
+                
+                <div class="d-flex justify-content-between">
+                    <button type="submit" class="btn btn-success">
+                        <i class="fas fa-save"></i> Salvar Agendamento
+                    </button>
+                    <a href="{% url 'listar_laboratorios' %}" class="btn btn-secondary">
+                        <i class="fas fa-arrow-left"></i> Voltar
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

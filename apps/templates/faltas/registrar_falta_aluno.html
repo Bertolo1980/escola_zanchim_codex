@@ -1,0 +1,255 @@
+{% extends 'base.html' %}
+
+{% block title %}Registrar Falta de Aluno{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-3 px-md-4">
+    <div class="row justify-content-center">
+        <div class="col-12 col-xl-10 col-xxl-8">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-primary text-white py-3">
+                    <h1 class="h4 mb-0">
+                        <i class="fas fa-user-clock me-2"></i>Registrar Falta de Aluno
+                    </h1>
+                </div>
+                <div class="card-body p-3 p-md-4">
+                    <form method="post" id="form-falta-aluno" class="row g-3">
+                        {% csrf_token %}
+                        <input type="hidden" name="aluno" id="aluno_id">
+                        <input type="hidden" name="quantidade" value="1">
+
+                        <div class="col-12">
+                            <label class="form-label fw-semibold d-block mb-2">
+                                <i class="fas fa-clock me-1"></i>Turno
+                            </label>
+                            <div class="d-flex flex-column flex-sm-row gap-2">
+                                <input type="radio" class="btn-check" name="turno_opcao" id="turno_manha" value="manha" autocomplete="off">
+                                <label class="btn btn-outline-primary text-start" for="turno_manha">
+                                    <i class="fas fa-sun me-1"></i>Manhã
+                                </label>
+
+                                <input type="radio" class="btn-check" name="turno_opcao" id="turno_tarde" value="tarde" autocomplete="off">
+                                <label class="btn btn-outline-primary text-start" for="turno_tarde">
+                                    <i class="fas fa-cloud-sun me-1"></i>Tarde
+                                </label>
+                            </div>
+                        </div>
+
+                        <div class="col-12 col-md-7">
+                            <label for="pedagoga" class="form-label fw-semibold">
+                                <i class="fas fa-user-tie me-1"></i>Pedagoga
+                            </label>
+                            <select name="pedagoga" id="pedagoga" class="form-control" required>
+                                <option value="">Selecione a pedagoga</option>
+                                <option value="Sonia">Sonia</option>
+                                <option value="Simone">Simone</option>
+                                <option value="Vanessa">Vanessa</option>
+                                <option value="Outra">Outra</option>
+                            </select>
+                        </div>
+
+                        <div class="col-12 col-md-5 d-none" id="pedagoga-outra-wrapper">
+                            <label for="pedagoga_outra" class="form-label fw-semibold">
+                                <i class="fas fa-user-tie me-1"></i>Nome da pedagoga
+                            </label>
+                            <input type="text" name="pedagoga_outra" id="pedagoga_outra" class="form-control" placeholder="Digite o nome">
+                        </div>
+
+                        <div class="col-12 col-md-7">
+                            <label for="turma" class="form-label fw-semibold">
+                                <i class="fas fa-users me-1"></i>Turma
+                            </label>
+                            <select id="turma" class="form-control" required disabled>
+                                <option value="">Selecione o turno primeiro</option>
+                            </select>
+                        </div>
+
+                        <div class="col-12 col-md-5">
+                            <label for="numero_aluno" class="form-label fw-semibold">
+                                <i class="fas fa-hashtag me-1"></i>Número do aluno
+                            </label>
+                            <input type="number" id="numero_aluno" class="form-control" min="1" placeholder="Número de chamada" required disabled>
+                        </div>
+
+                        <div class="col-12 col-md-5">
+                            <label for="data" class="form-label fw-semibold">
+                                <i class="fas fa-calendar me-1"></i>Data
+                            </label>
+                            <input type="date" name="data" id="data" class="form-control" value="{% now 'Y-m-d' %}" required>
+                        </div>
+
+                        <div class="col-12">
+                            <div id="aluno-alerta" class="alert alert-info d-none mb-0" role="alert">
+                                <div class="d-flex gap-2">
+                                    <i id="aluno-alerta-icone" class="fas fa-user-graduate mt-1"></i>
+                                    <div>
+                                        <div class="fw-semibold" id="aluno-nome"></div>
+                                        <div class="small" id="aluno-turma"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-12">
+                            <label for="observacoes" class="form-label fw-semibold">
+                                <i class="fas fa-comment me-1"></i>Observação
+                            </label>
+                            <textarea name="observacoes" id="observacoes" class="form-control" rows="4" placeholder="Registre observações relevantes sobre a falta"></textarea>
+                        </div>
+
+                        <div class="col-12 d-flex flex-column flex-md-row gap-2 justify-content-end pt-2">
+                            <a href="{% url 'controle_faltas_alunos' %}" class="btn btn-outline-secondary">
+                                <i class="fas fa-arrow-left me-1"></i>Voltar
+                            </a>
+                            <button type="submit" id="btn-salvar" class="btn btn-success" disabled>
+                                <i class="fas fa-save me-1"></i>Salvar Falta
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{{ turmas|json_script:"turmas-data" }}
+{{ alunos|json_script:"alunos-data" }}
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const turmas = JSON.parse(document.getElementById('turmas-data').textContent);
+    const alunos = JSON.parse(document.getElementById('alunos-data').textContent);
+
+    const turnoRadios = document.querySelectorAll('input[name="turno_opcao"]');
+    const turmaSelect = document.getElementById('turma');
+    const numeroInput = document.getElementById('numero_aluno');
+    const alunoIdInput = document.getElementById('aluno_id');
+    const alerta = document.getElementById('aluno-alerta');
+    const alertaIcone = document.getElementById('aluno-alerta-icone');
+    const alunoNome = document.getElementById('aluno-nome');
+    const alunoTurma = document.getElementById('aluno-turma');
+    const salvarButton = document.getElementById('btn-salvar');
+    const form = document.getElementById('form-falta-aluno');
+    const pedagogaSelect = document.getElementById('pedagoga');
+    const pedagogaOutraWrapper = document.getElementById('pedagoga-outra-wrapper');
+    const pedagogaOutraInput = document.getElementById('pedagoga_outra');
+
+    function alternarPedagogaOutra() {
+        const usarOutra = pedagogaSelect.value === 'Outra';
+        pedagogaOutraWrapper.classList.toggle('d-none', !usarOutra);
+        pedagogaOutraInput.required = usarOutra;
+        if (!usarOutra) {
+            pedagogaOutraInput.value = '';
+        }
+    }
+
+    function turnoSelecionado() {
+        const radio = document.querySelector('input[name="turno_opcao"]:checked');
+        return radio ? radio.value : '';
+    }
+
+    function mostrarAviso(tipo, mensagem, detalhe) {
+        alunoIdInput.value = '';
+        salvarButton.disabled = true;
+        alunoNome.textContent = mensagem || '';
+        alunoTurma.textContent = detalhe || '';
+
+        if (!mensagem) {
+            alerta.className = 'alert alert-info d-none mb-0';
+            return;
+        }
+
+        const classe = tipo === 'sucesso' ? 'alert alert-success mb-0' : 'alert alert-warning mb-0';
+        const icone = tipo === 'sucesso' ? 'fas fa-user-graduate mt-1' : 'fas fa-circle-exclamation mt-1';
+        alerta.className = classe;
+        alertaIcone.className = icone;
+    }
+
+    function limparAluno() {
+        mostrarAviso('', '', '');
+    }
+
+    function preencherTurmas() {
+        const turno = turnoSelecionado();
+        turmaSelect.innerHTML = '';
+        numeroInput.value = '';
+        numeroInput.disabled = true;
+        limparAluno();
+
+        if (!turno) {
+            turmaSelect.disabled = true;
+            turmaSelect.innerHTML = '<option value="">Selecione o turno primeiro</option>';
+            return;
+        }
+
+        const turmasFiltradas = turmas.filter(turma => turma.turno === turno);
+        turmaSelect.disabled = false;
+        turmaSelect.innerHTML = '<option value="">Selecione a turma</option>';
+
+        turmasFiltradas.forEach(turma => {
+            const option = document.createElement('option');
+            option.value = turma.id;
+            option.textContent = `${turma.serie} - ${turma.nome}`;
+            turmaSelect.appendChild(option);
+        });
+
+        if (!turmasFiltradas.length) {
+            turmaSelect.innerHTML = '<option value="">Nenhuma turma neste turno</option>';
+            turmaSelect.disabled = true;
+            mostrarAviso('erro', 'Nenhuma turma encontrada para este turno.', '');
+        }
+    }
+
+    function localizarAluno() {
+        const turmaId = Number(turmaSelect.value);
+        const numero = Number(numeroInput.value);
+        limparAluno();
+
+        if (!turmaId || !numero) {
+            return;
+        }
+
+        const aluno = alunos.find(item => Number(item.turma_id) === turmaId && Number(item.numero) === numero);
+        if (!aluno) {
+            mostrarAviso('erro', 'Aluno não encontrado.', 'Confira a turma e o número de chamada.');
+            return;
+        }
+
+        alunoIdInput.value = aluno.id;
+        alunoNome.textContent = aluno.nome;
+        alunoTurma.textContent = `${aluno.turma_serie} - ${aluno.turma_nome}`;
+        alerta.className = 'alert alert-success mb-0';
+        alertaIcone.className = 'fas fa-user-graduate mt-1';
+        salvarButton.disabled = false;
+    }
+
+    turnoRadios.forEach(radio => {
+        radio.addEventListener('change', preencherTurmas);
+    });
+
+    turmaSelect.addEventListener('change', function () {
+        numeroInput.value = '';
+        numeroInput.disabled = !turmaSelect.value;
+        limparAluno();
+        if (!numeroInput.disabled) {
+            numeroInput.focus();
+        }
+    });
+
+    numeroInput.addEventListener('input', localizarAluno);
+    pedagogaSelect.addEventListener('change', alternarPedagogaOutra);
+
+    form.addEventListener('submit', function (event) {
+        alternarPedagogaOutra();
+        if (!alunoIdInput.value) {
+            event.preventDefault();
+            mostrarAviso('erro', 'Localize o aluno antes de salvar.', 'Selecione turno, turma e informe o número de chamada.');
+            numeroInput.focus();
+        }
+    });
+    alternarPedagogaOutra();
+});
+</script>
+{% endblock %}
