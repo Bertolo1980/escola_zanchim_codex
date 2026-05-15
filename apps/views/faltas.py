@@ -1,4 +1,21 @@
-﻿from .utilitarios import *
+﻿import logging
+
+from .utilitarios import *
+from apps.services.whatsapp_service import enviar_template_aviso_falta_aluno
+
+logger = logging.getLogger(__name__)
+
+
+def _telefone_whatsapp_aluno(aluno):
+    for campo in ('telefone_responsavel', 'telefone'):
+        telefone = getattr(aluno, campo, None)
+        if telefone is None:
+            continue
+        telefone = str(telefone).strip()
+        if telefone:
+            return telefone
+    return ''
+
 
 # ===== NOVAS VIEWS PARA CONTROLE DE FALTAS =====
 
@@ -323,7 +340,8 @@ def registrar_falta_aluno(request):
         aluno_id = request.POST.get('aluno')
         data = request.POST.get('data')
         quantidade = request.POST.get('quantidade', 1)
-        justificada = request.POST.get('justificada') == 'on'
+        possui_atestado = request.POST.get('possui_atestado') == 'sim'
+        justificada = possui_atestado or request.POST.get('justificada') == 'on'
         responsavel = request.POST.get('responsavel', '')
         observacoes = request.POST.get('observacoes', '')
         pedagoga = request.POST.get('pedagoga', '').strip()
@@ -352,7 +370,46 @@ def registrar_falta_aluno(request):
                 registrado_por=request.user
             )
 
-            messages.success(request, f'Falta registrada para {aluno.nome}')
+            if possui_atestado:
+                messages.success(request, 'Falta registrada com atestado e sem envio de aviso.')
+                return redirect('registrar_falta_aluno')
+
+            telefone = _telefone_whatsapp_aluno(aluno)
+            if not telefone:
+                logger.warning(
+                    'Falta registrada sem envio de WhatsApp: aluno sem telefone cadastrado.',
+                    extra={
+                        'aluno': aluno.nome,
+                        'aluno_id': aluno.id,
+                        'data_falta': str(falta.data),
+                    },
+                )
+                messages.warning(request, 'Falta registrada, mas não há telefone cadastrado para envio do WhatsApp.')
+                return redirect('registrar_falta_aluno')
+
+            try:
+                data_falta = datetime.strptime(str(falta.data), '%Y-%m-%d').strftime('%d/%m/%Y')
+            except ValueError:
+                data_falta = str(falta.data)
+
+            resultado_whatsapp = enviar_template_aviso_falta_aluno(telefone, aluno.nome, data_falta)
+
+            if resultado_whatsapp.get('status'):
+                messages.success(request, 'Falta registrada e aviso enviado pelo WhatsApp.')
+            else:
+                logger.warning(
+                    'Falta registrada, mas envio de WhatsApp falhou.',
+                    extra={
+                        'aluno': aluno.nome,
+                        'aluno_id': aluno.id,
+                        'numero_usado': resultado_whatsapp.get('numero') or telefone,
+                        'data_falta': str(falta.data),
+                        'erro_whatsapp': resultado_whatsapp.get('erro'),
+                        'resposta_whatsapp': resultado_whatsapp.get('resposta'),
+                        'status_code_whatsapp': resultado_whatsapp.get('status_code'),
+                    },
+                )
+                messages.warning(request, 'Falta registrada, mas a mensagem não foi enviada. Confira o número do responsável.')
 
         except Exception as e:
             messages.error(request, f'Erro: {str(e)}')
