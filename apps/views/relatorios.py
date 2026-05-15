@@ -1,7 +1,7 @@
-from .utilitarios import *
+﻿from .utilitarios import *
 from ..forms import RelatorioFaltasForm
 
-# ===== NOVA VIEW: RELATÓRIO DE FALTAS POR ALUNO =====
+# ===== NOVA VIEW: RELATÃ“RIO DE FALTAS POR ALUNO =====
 @relatorios_required
 def relatorio_faltas(request):
     form = RelatorioFaltasForm()
@@ -21,14 +21,11 @@ def relatorio_faltas(request):
                 aluno = Aluno.objects.filter(turma=turma, nome__icontains=identificador).first()
 
             if not aluno:
-                erro = 'Aluno não encontrado nesta turma.'
+                erro = 'Aluno nÃ£o encontrado nesta turma.'
             else:
-                # Busca as ocorrências onde o aluno faltou (faltou=True)
-                faltas = RegistroOcorrenciaAluno.objects.filter(
-                    aluno=aluno,
-                    faltou=True
-                ).order_by('-data')
-                total_faltas = faltas.count()  # cada ocorrência conta como 1 falta
+                # Busca faltas reais de alunos; ocorrencias disciplinares ficam em outro model.
+                faltas = RegistroFaltaAluno.objects.filter(aluno=aluno).order_by('-data')
+                total_faltas = sum(falta.quantidade_faltas or 1 for falta in faltas)
                 return render(request, 'faltas/relatorio_faltas.html', {
                     'aluno': aluno,
                     'faltas': faltas,
@@ -39,13 +36,12 @@ def relatorio_faltas(request):
 
 @relatorios_required
 def relatorio_faltas_por_aluno(request):
-    # Pega mês e ano da URL (ou atual)
+    # Pega mÃªs e ano da URL (ou atual)
     mes = int(request.GET.get('mes', timezone.now().month))
     ano = int(request.GET.get('ano', timezone.now().year))
 
-    # Filtra ocorrências com falta no período
-    faltas = RegistroOcorrenciaAluno.objects.filter(
-        faltou=True,
+    # Filtra faltas reais de alunos no periodo.
+    faltas = RegistroFaltaAluno.objects.filter(
         data__year=ano,
         data__month=mes
     ).select_related('aluno', 'aluno__turma')
@@ -55,7 +51,7 @@ def relatorio_faltas_por_aluno(request):
     for falta in faltas:
         aluno = falta.aluno
         key = (aluno.turma.nome, aluno.numero, aluno.nome)
-        alunos_faltas[key] = alunos_faltas.get(key, 0) + 1
+        alunos_faltas[key] = alunos_faltas.get(key, 0) + (falta.quantidade_faltas or 1)
 
     # Converte para lista ordenada
     dados = []
@@ -82,48 +78,38 @@ def exportar_relatorio_faltas(request):
     mes = int(request.GET.get('mes', timezone.now().month))
     ano = int(request.GET.get('ano', timezone.now().year))
 
-    # Busca TODOS os registros (não só faltas)
-    ocorrencias = RegistroOcorrenciaAluno.objects.filter(
+    faltas = RegistroFaltaAluno.objects.filter(
         data__year=ano,
         data__month=mes
     ).select_related('aluno', 'aluno__turma').order_by('data', 'aluno__turma__nome', 'aluno__numero')
 
-    # Prepara os dados para o Excel (COM ORDEM FIXA)
     data = []
-    for ocorrencia in ocorrencias:
+    for falta in faltas:
         data.append({
-            'Data': ocorrencia.data.strftime('%d/%m/%Y'),
-            'Turma': ocorrencia.aluno.turma.nome,
-            'Nº': ocorrencia.aluno.numero,
-            'Aluno': ocorrencia.aluno.nome,
-            'Tipo': ocorrencia.get_tipo_ocorrencia_display(),
-            'Horário Chegada': ocorrencia.horario_chegada.strftime('%H:%M') if ocorrencia.horario_chegada else '',
-            'Atendido por': ocorrencia.atendido_por,
-            'Motivo (aluno)': ocorrencia.motivo_alegado,
-            'Responsável contatado': ocorrencia.responsavel_contatado,
-            'Hora contato': ocorrencia.horario_contato.strftime('%H:%M') if ocorrencia.horario_contato else '',
-            'Alegado (responsável)': ocorrencia.alegado_responsavel,
+            'Data': falta.data.strftime('%d/%m/%Y'),
+            'Turma': falta.aluno.turma.nome,
+            'Nº': falta.aluno.numero,
+            'Aluno': falta.aluno.nome,
+            'Faltas': falta.quantidade_faltas or 1,
+            'Justificada': 'Sim' if falta.justificada else 'Nao',
+            'Pedagoga': falta.pedagoga,
+            'Responsavel contatado': falta.responsavel_contatado,
+            'Observacoes': falta.observacoes,
         })
 
-    # Cria o DataFrame com a ORDEm das colunas DEFINIDA
-    colunas_ordem = ['Data', 'Turma', 'Nº', 'Aluno', 'Tipo', 'Horário Chegada',
-                     'Atendido por', 'Motivo (aluno)', 'Responsável contatado',
-                     'Hora contato', 'Alegado (responsável)']
+    colunas_ordem = ['Data', 'Turma', 'Nº', 'Aluno', 'Faltas', 'Justificada',
+                     'Pedagoga', 'Responsavel contatado', 'Observacoes']
 
     df = pd.DataFrame(data, columns=colunas_ordem)
-
-    # Se não houver dados, cria um DataFrame vazio com as colunas
     if df.empty:
         df = pd.DataFrame(columns=colunas_ordem)
 
-    # Gera o Excel
     output = BytesIO()
-    sheet_name = f'Ocorrencias_{mes:02d}_{ano}'
+    sheet_name = f'Faltas_{mes:02d}_{ano}'
     with pd.ExcelWriter(output, engine='openpyxl') as writer:
         df.to_excel(writer, sheet_name=sheet_name, index=False)
         worksheet = writer.sheets[sheet_name]
 
-        # Ajusta largura das colunas
         for column in worksheet.columns:
             max_length = 0
             column_letter = column[0].column_letter
@@ -138,9 +124,8 @@ def exportar_relatorio_faltas(request):
 
     output.seek(0)
     response = HttpResponse(output, content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
-    response['Content-Disposition'] = f'attachment; filename="relatorio_ocorrencias_{mes:02d}_{ano}.xlsx"'
+    response['Content-Disposition'] = f'attachment; filename="relatorio_faltas_{mes:02d}_{ano}.xlsx"'
     return response
-
 
 @relatorios_required
 def relatorio_faltas_mensal(request):
@@ -170,10 +155,10 @@ def relatorio_faltas_mensal(request):
     }
     return render(request, 'faltas/relatorio_faltas.html', context)
 
-# ===== HISTÓRICO DE ACESSOS =====
+# ===== HISTÃ“RICO DE ACESSOS =====
 @login_required
 def historico_acessos(request):
-    # Apenas superusuários podem acessar
+    # Apenas superusuÃ¡rios podem acessar
     if not request.user.is_superuser:
         return redirect('painel_equipe')
 
@@ -205,10 +190,10 @@ def lancar_ponto(request):
         )
         if acao == 'entrada':
             registro.entrada_real = timezone.now()
-            messages.success(request, f'Entrada registrada para {professor.get_full_name()} às {timezone.now().strftime("%H:%M")}')
+            messages.success(request, f'Entrada registrada para {professor.get_full_name()} Ã s {timezone.now().strftime("%H:%M")}')
         elif acao == 'saida':
             registro.saida_real = timezone.now()
-            messages.success(request, f'Saída registrada para {professor.get_full_name()} às {timezone.now().strftime("%H:%M")}')
+            messages.success(request, f'SaÃ­da registrada para {professor.get_full_name()} Ã s {timezone.now().strftime("%H:%M")}')
         registro.save()
         return redirect('lancar_ponto')
     context = {
@@ -250,40 +235,40 @@ def relatorio_ponto(request):
     return render(request, 'relatorio_ponto.html', context)
 
 # =============================================================================
-# FUNÇÃO PARA ARQUIVAR MÊS
+# FUNÃ‡ÃƒO PARA ARQUIVAR MÃŠS
 # =============================================================================
 @relatorios_required
 def arquivar_mes(request):
     print("="*50)
-    print("🚀 FUNÇÃO ARQUIVAR_MES FOI CHAMADA!")
+    print("ðŸš€ FUNÃ‡ÃƒO ARQUIVAR_MES FOI CHAMADA!")
     print("="*50)
 
     faltas = RegistroFalta.objects.all()
-    print(f"📊 Total de registros encontrados: {faltas.count()}")
+    print(f"ðŸ“Š Total de registros encontrados: {faltas.count()}")
 
     if not faltas.exists():
-        print("⚠️ Nenhum registro encontrado. Abortando missão.")
-        messages.warning(request, "Nenhum registro para arquivar este mês.")
+        print("âš ï¸ Nenhum registro encontrado. Abortando missÃ£o.")
+        messages.warning(request, "Nenhum registro para arquivar este mÃªs.")
         return redirect('controle_faltas')
 
     hoje = datetime.now()
     mes_atual = hoje.strftime("%B").capitalize()
     ano_atual = hoje.strftime("%Y")
     nome_arquivo = f"faltas_{mes_atual}_{ano_atual}.xlsx"
-    print(f"📁 Nome do arquivo a ser criado: {nome_arquivo}")
+    print(f"ðŸ“ Nome do arquivo a ser criado: {nome_arquivo}")
 
     caminho_pasta = os.path.join(settings.MEDIA_ROOT, 'arquivos_mensais')
     os.makedirs(caminho_pasta, exist_ok=True)
     caminho_completo = os.path.join(caminho_pasta, nome_arquivo)
-    print(f"📂 Caminho completo: {caminho_completo}")
+    print(f"ðŸ“‚ Caminho completo: {caminho_completo}")
 
     try:
-        print("📄 Tentando criar o arquivo Excel com openpyxl...")
+        print("ðŸ“„ Tentando criar o arquivo Excel com openpyxl...")
         wb = openpyxl.Workbook()
         ws = wb.active
         ws.title = f"{mes_atual} {ano_atual}"
 
-        headers = ['Professor', 'Data', 'Dia', 'Previsto', 'Real', 'Status', 'Minutos', 'Observação']
+        headers = ['Professor', 'Data', 'Dia', 'Previsto', 'Real', 'Status', 'Minutos', 'ObservaÃ§Ã£o']
         for col_num, header in enumerate(headers, 1):
             cell = ws.cell(row=1, column=col_num, value=header)
             cell.font = Font(bold=True)
@@ -300,36 +285,36 @@ def arquivar_mes(request):
             ws.cell(row=row_num, column=7, value=f"{falta.minutos_faltados()} min")
             ws.cell(row=row_num, column=8, value=falta.observacao or '-')
 
-        print("✅ Dados inseridos no Excel com sucesso.")
-        print("💾 Tentando salvar o arquivo...")
+        print("âœ… Dados inseridos no Excel com sucesso.")
+        print("ðŸ’¾ Tentando salvar o arquivo...")
         wb.save(caminho_completo)
-        print("✅ Arquivo salvo com sucesso no disco!")
+        print("âœ… Arquivo salvo com sucesso no disco!")
 
     except Exception as e:
-        print(f"❌❌❌ ERRO NA CRIAÇÃO DO EXCEL: {e}")
+        print(f"âŒâŒâŒ ERRO NA CRIAÃ‡ÃƒO DO EXCEL: {e}")
         messages.error(request, f"Erro ao criar arquivo Excel: {e}")
         return redirect('controle_faltas')
 
-    messages.success(request, f"Mês de {mes_atual} arquivado com sucesso!")
+    messages.success(request, f"MÃªs de {mes_atual} arquivado com sucesso!")
     print("="*50)
-    print("🎉🎉🎉 FUNÇÃO ARQUIVAR_MES CONCLUÍDA COM SUCESSO! 🎉🎉🎉")
+    print("ðŸŽ‰ðŸŽ‰ðŸŽ‰ FUNÃ‡ÃƒO ARQUIVAR_MES CONCLUÃDA COM SUCESSO! ðŸŽ‰ðŸŽ‰ðŸŽ‰")
     print("="*50)
     return redirect('controle_faltas')
 
 # =============================================================================
-# FUNÇÃO PARA EXPORTAR EXCEL (SEM APAGAR NADA)
+# FUNÃ‡ÃƒO PARA EXPORTAR EXCEL (SEM APAGAR NADA)
 # =============================================================================
 @relatorios_required
 def exportar_excel_faltas(request):
     """Gera um arquivo Excel com os registros ATUAIS (sem apagar nada)"""
 
-    # Pega os registros do mês atual (mesmo filtro da página)
+    # Pega os registros do mÃªs atual (mesmo filtro da pÃ¡gina)
     mes = request.GET.get('mes', timezone.now().month)
     ano = request.GET.get('ano', timezone.now().year)
     faltas = RegistroFalta.objects.filter(data__month=mes, data__year=ano).select_related('professor').order_by('-data')
 
     if not faltas.exists():
-        messages.warning(request, 'Nenhum registro para exportar neste mês.')
+        messages.warning(request, 'Nenhum registro para exportar neste mÃªs.')
         return redirect('controle_faltas')
 
     # Cria o arquivo Excel
@@ -337,8 +322,8 @@ def exportar_excel_faltas(request):
     ws = wb.active
     ws.title = f"Faltas {mes}-{ano}"
 
-    # Cabeçalho
-    headers = ['Professor', 'Data', 'Dia', 'Previsto', 'Real', 'Status', 'Minutos', 'Observação']
+    # CabeÃ§alho
+    headers = ['Professor', 'Data', 'Dia', 'Previsto', 'Real', 'Status', 'Minutos', 'ObservaÃ§Ã£o']
     for col_num, header in enumerate(headers, 1):
         cell = ws.cell(row=1, column=col_num, value=header)
         cell.font = Font(bold=True)
@@ -393,7 +378,7 @@ def listar_relatorios_mensais(request):
     return render(request, 'faltas/lista_relatorios.html', {'arquivos': arquivos})
 
 # =============================================================================
-# RELATÓRIO DE FALTAS DE ALUNOS EM EXCEL (DOWNLOAD DIRETO)
+# RELATÃ“RIO DE FALTAS DE ALUNOS EM EXCEL (DOWNLOAD DIRETO)
 # =============================================================================
 import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment
@@ -403,25 +388,25 @@ from ..models import RegistroFaltaAluno
 
 @relatorios_required
 def relatorio_faltas_alunos(request):
-    # Pega os parâmetros da URL (mês e ano)
+    # Pega os parÃ¢metros da URL (mÃªs e ano)
     mes = request.GET.get('mes')
     ano = request.GET.get('ano')
 
-    # Se não vierem, usa o mês/ano atual
+    # Se nÃ£o vierem, usa o mÃªs/ano atual
     if not mes or not ano:
         hoje = datetime.now()
         mes = hoje.month
         ano = hoje.year
 
-    # Busca as faltas do período, ordenadas por turma, número e data
+    # Busca as faltas do perÃ­odo, ordenadas por turma, nÃºmero e data
     faltas = RegistroFaltaAluno.objects.filter(
         data__month=mes,
         data__year=ano
     ).select_related('aluno', 'aluno__turma').order_by('aluno__turma__nome', 'aluno__numero', 'data')
 
-    # Se não houver faltas, exibe mensagem e volta
+    # Se nÃ£o houver faltas, exibe mensagem e volta
     if not faltas.exists():
-        messages.warning(request, 'Nenhuma falta encontrada para o período selecionado.')
+        messages.warning(request, 'Nenhuma falta encontrada para o perÃ­odo selecionado.')
         return redirect('painel_equipe')
 
     # Cria o arquivo Excel
@@ -429,8 +414,8 @@ def relatorio_faltas_alunos(request):
     ws = wb.active
     ws.title = f"Faltas {mes}-{ano}"
 
-    # Cabeçalho
-    headers = ['Turma', 'Nº', 'Aluno', 'Data', 'Faltas', 'Justificada', 'Responsável', 'Observações']
+    # CabeÃ§alho
+    headers = ['Turma', 'NÂº', 'Aluno', 'Data', 'Faltas', 'Justificada', 'ResponsÃ¡vel', 'ObservaÃ§Ãµes']
     for col_num, header in enumerate(headers, 1):
         cell = ws.cell(row=1, column=col_num, value=header)
         cell.font = Font(bold=True)
@@ -444,7 +429,7 @@ def relatorio_faltas_alunos(request):
         ws.cell(row=row_num, column=3, value=falta.aluno.nome)
         ws.cell(row=row_num, column=4, value=falta.data.strftime('%d/%m/%Y'))
         ws.cell(row=row_num, column=5, value=falta.quantidade_faltas)
-        ws.cell(row=row_num, column=6, value='Sim' if falta.justificada else 'Não')
+        ws.cell(row=row_num, column=6, value='Sim' if falta.justificada else 'NÃ£o')
         ws.cell(row=row_num, column=7, value=falta.responsavel_contatado or '-')
         ws.cell(row=row_num, column=8, value=falta.observacoes or '-')
 
@@ -475,9 +460,9 @@ def relatorio_faltas_alunos(request):
 
 @relatorios_required
 def limpeza_sistema(request):
-    """Executa o script de limpeza do sistema (apenas superusuário)"""
+    """Executa o script de limpeza do sistema (apenas superusuÃ¡rio)"""
     if not request.user.is_superuser:
-        messages.error(request, "Acesso negado. Apenas superusuário.")
+        messages.error(request, "Acesso negado. Apenas superusuÃ¡rio.")
         return redirect('painel_equipe')
 
     try:
@@ -491,9 +476,9 @@ def limpeza_sistema(request):
         )
         output = resultado.stdout + resultado.stderr
 
-        # Se o script não existir, criar um básico
+        # Se o script nÃ£o existir, criar um bÃ¡sico
         if "No such file" in output:
-            output = "⚠️ Script de limpeza não encontrado. Execute o comando manualmente:\n\n./limpeza.sh"
+            output = "âš ï¸ Script de limpeza nÃ£o encontrado. Execute o comando manualmente:\n\n./limpeza.sh"
 
         return render(request, 'limpeza_resultado.html', {'output': output})
 
@@ -535,7 +520,7 @@ def exportar_busca_ativa(request):
             occ.aluno.turma.nome,
             occ.aluno.numero,
             occ.aluno.nome,
-            'Sim' if occ.busca_ativa_realizada else 'Não',
+            'Sim' if occ.busca_ativa_realizada else 'NÃ£o',
             occ.atendido_por or '',
             occ.motivo_alegado or '',
             occ.responsavel_contatado or '',
@@ -544,13 +529,13 @@ def exportar_busca_ativa(request):
         ])
 
     if not data:
-        data = [['Sem dados para o período', '', '', '', '', '', '', '', '', '']]
+        data = [['Sem dados para o perÃ­odo', '', '', '', '', '', '', '', '', '']]
 
-    # Cabeçalho com duas novas colunas
+    # CabeÃ§alho com duas novas colunas
     df = pd.DataFrame(data, columns=[
-        'Data', 'Turma', 'Nº', 'Aluno', 'Busca Ativa Realizada',
-        'Atendido por', 'Motivo Alegado', 'Responsável Contatado',
-        'Hora Contato', 'Alegado pelo Responsável'   # ← NOVAS
+        'Data', 'Turma', 'NÂº', 'Aluno', 'Busca Ativa Realizada',
+        'Atendido por', 'Motivo Alegado', 'ResponsÃ¡vel Contatado',
+        'Hora Contato', 'Alegado pelo ResponsÃ¡vel'   # â† NOVAS
     ])
 
     output = BytesIO()
@@ -575,40 +560,40 @@ def exportar_busca_ativa(request):
     return response
 
 # =============================================================================
-# RELATÓRIO DE OCORRÊNCIAS DE ALUNOS EM EXCEL
+# RELATÃ“RIO DE OCORRÃŠNCIAS DE ALUNOS EM EXCEL
 # =============================================================================
 @relatorios_required
 def relatorio_ocorrencias_alunos(request):
-    # Pega os parâmetros da URL (mês e ano)
+    # Pega os parÃ¢metros da URL (mÃªs e ano)
     mes = request.GET.get('mes')
     ano = request.GET.get('ano')
 
-    # Se não vierem, usa o mês/ano atual
+    # Se nÃ£o vierem, usa o mÃªs/ano atual
     if not mes or not ano:
         hoje = datetime.now()
         mes = hoje.month
         ano = hoje.year
 
-    # Busca as ocorrências do período
+    # Busca as ocorrÃªncias do perÃ­odo
     ocorrencias = RegistroOcorrenciaAluno.objects.filter(
         data__month=mes,
         data__year=ano
     ).select_related('aluno', 'aluno__turma').order_by('-data', '-horario_chegada')
 
     if not ocorrencias.exists():
-        messages.warning(request, 'Nenhuma ocorrência encontrada para o período selecionado.')
+        messages.warning(request, 'Nenhuma ocorrÃªncia encontrada para o perÃ­odo selecionado.')
         return redirect('painel_equipe')
 
     # Cria o arquivo Excel
     wb = openpyxl.Workbook()
     ws = wb.active
-    ws.title = f"Ocorrências {mes}-{ano}"
+    ws.title = f"OcorrÃªncias {mes}-{ano}"
 
-    # Cabeçalho - COM COLUNA TIPO
+    # CabeÃ§alho - COM COLUNA TIPO
     headers = [
-        'Data', 'Turma', 'Nº', 'Aluno', 'Tipo',
-        'Horário Chegada', 'Atendido por', 'Motivo (aluno)',
-        'Responsável contatado', 'Hora contato', 'Alegado (responsável)'
+        'Data', 'Turma', 'NÂº', 'Aluno', 'Tipo',
+        'HorÃ¡rio Chegada', 'Atendido por', 'Motivo (aluno)',
+        'ResponsÃ¡vel contatado', 'Hora contato', 'Alegado (responsÃ¡vel)'
     ]
     for col_num, header in enumerate(headers, 1):
         cell = ws.cell(row=1, column=col_num, value=header)
@@ -624,7 +609,7 @@ def relatorio_ocorrencias_alunos(request):
         ws.cell(row=row_num, column=4, value=occ.aluno.nome)
         # COLUNA TIPO (nova)
         ws.cell(row=row_num, column=5, value=occ.get_tipo_ocorrencia_display())
-        # Horário Chegada (sem "FALTA")
+        # HorÃ¡rio Chegada (sem "FALTA")
         ws.cell(row=row_num, column=6, value=occ.horario_chegada.strftime('%H:%M') if occ.horario_chegada else '')
         ws.cell(row=row_num, column=7, value=occ.atendido_por or '')
         ws.cell(row=row_num, column=8, value=occ.motivo_alegado or '')
@@ -653,7 +638,7 @@ def relatorio_ocorrencias_alunos(request):
     return response
 
 # =============================================================================
-# RELATÓRIO DE OCORRÊNCIAS POR TIPO (NOVO)
+# RELATÃ“RIO DE OCORRÃŠNCIAS POR TIPO (NOVO)
 # =============================================================================
 
 @relatorios_required
@@ -688,7 +673,7 @@ def relatorio_ocorrencias_por_tipo(request):
         ano = int(ano)
 
     tipo_nomes = {
-        'todas': 'Todas as ocorrências',
+        'todas': 'Todas as ocorrÃªncias',
         'falta': 'Falta',
         'atraso': 'Atraso',
         'piercing': 'Uso de Piercing',
@@ -706,7 +691,7 @@ def relatorio_ocorrencias_por_tipo(request):
         ocorrencias = ocorrencias.filter(tipo_ocorrencia=tipo)
 
     if not ocorrencias.exists():
-        messages.warning(request, f'Nenhuma ocorrência do tipo "{tipo_nomes.get(tipo, tipo)}" encontrada para o período.')
+        messages.warning(request, f'Nenhuma ocorrÃªncia do tipo "{tipo_nomes.get(tipo, tipo)}" encontrada para o perÃ­odo.')
         return redirect('painel_equipe')
 
     wb = openpyxl.Workbook()
@@ -715,11 +700,11 @@ def relatorio_ocorrencias_por_tipo(request):
 
     # HEADERS COM COLUNA TIPO
     if tipo == 'desvio_normas':
-        headers = ['Data', 'Turma', 'Nº', 'Aluno', 'Tipo', 'Atendido por',
-                   'Motivo', 'Responsável', 'Alegado', 'ATA']
+        headers = ['Data', 'Turma', 'NÂº', 'Aluno', 'Tipo', 'Atendido por',
+                   'Motivo', 'ResponsÃ¡vel', 'Alegado', 'ATA']
     else:
-        headers = ['Data', 'Turma', 'Nº', 'Aluno', 'Tipo', 'Atendido por',
-                   'Motivo', 'Responsável', 'Alegado']
+        headers = ['Data', 'Turma', 'NÂº', 'Aluno', 'Tipo', 'Atendido por',
+                   'Motivo', 'ResponsÃ¡vel', 'Alegado']
 
     for col_num, header in enumerate(headers, 1):
         cell = ws.cell(row=1, column=col_num, value=header)

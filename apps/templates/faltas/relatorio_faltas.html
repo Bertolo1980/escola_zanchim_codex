@@ -1,9 +1,9 @@
-{% extends 'base.html' %}
+﻿{% extends 'base.html' %}
 {% block content %}
 <div class="container-fluid px-2 px-md-4 py-3">
     <div class="card">
         <div class="card-header bg-success text-white">
-            <h4><i class="fas fa-user-graduate me-2"></i>Relatório de Faltas</h4>
+            <h4><i class="fas fa-user-graduate me-2"></i>RelatÃ³rio de Faltas</h4>
         </div>
         <div class="card-body">
             <p><strong>Aluno:</strong> {{ aluno.nome }} ({{ aluno.turma.nome }})</p>
@@ -14,22 +14,24 @@
                 <thead>
                     <tr>
                         <th>Data</th>
-                        <th>Motivo alegado</th>
-                        <th>Responsável contatado</th>
-                        <th>Alegado pelo responsável</th>
+                        <th>Quantidade</th>
+                        <th>Justificada</th>
+                        <th>ResponsÃ¡vel contatado</th>
+                        <th>Observacoes</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for falta in faltas %}
                     <tr>
                         <td>{{ falta.data|date:"d/m/Y" }}</td>
-                        <td>{{ falta.motivo_alegado|default:"—" }}</td>
-                        <td>{{ falta.responsavel_contatado|default:"—" }}</td>
-                        <td>{{ falta.alegado_responsavel|default:"—" }}</td>
+                        <td>{{ falta.quantidade_faltas }}</td>
+                        <td>{% if falta.justificada %}Sim{% else %}Nao{% endif %}</td>
+                        <td>{{ falta.responsavel_contatado|default:"â€”" }}</td>
+                        <td>{{ falta.observacoes|default:"-" }}</td>
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="4" class="text-center">Nenhuma falta registrada para este aluno.</td>
+                        <td colspan="5" class="text-center">Nenhuma falta registrada para este aluno.</td>
                     </tr>
                     {% endfor %}
                 </tbody>

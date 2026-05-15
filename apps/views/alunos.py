@@ -1,10 +1,12 @@
-from .utilitarios import *
+﻿from .utilitarios import *
 
 @login_required
 @user_passes_test(grupo_digitadores, login_url='/')
 def formulario_digitador(request):
-    """View exclusiva para digitadores (apenas o formulário de ocorrências)"""
-    # Recupera última data da sessão
+    """View exclusiva para digitadores (apenas o formulÃ¡rio de ocorrÃªncias)"""
+    tipos_ocorrencia_permitidos = {'atraso', 'piercing', 'cabelo', 'uniforme', 'desvio_normas'}
+
+    # Recupera Ãºltima data da sessÃ£o
     ultima_data_str = request.session.get('ultima_data_ocorrencia')
     if ultima_data_str:
         try:
@@ -14,7 +16,7 @@ def formulario_digitador(request):
     else:
         ultima_data = timezone.now().date()
 
-    # Recupera última turma da sessão
+    # Recupera Ãºltima turma da sessÃ£o
     ultima_turma_id = request.session.get('ultima_turma_ocorrencia_id')
     ultima_turma = None
     if ultima_turma_id:
@@ -31,7 +33,7 @@ def formulario_digitador(request):
 
             aluno = Aluno.objects.filter(turma=turma, numero=numero).first()
             if not aluno:
-                messages.error(request, f'Aluno número {numero} não encontrado na turma {turma.nome}!')
+                messages.error(request, f'Aluno nÃºmero {numero} nÃ£o encontrado na turma {turma.nome}!')
                 return render(request, 'ocorrencias/formulario_digitador.html', {
                     'form': form,
                     'ultimas_ocorrencias': RegistroOcorrenciaAluno.objects.select_related('aluno', 'aluno__turma').order_by('-data', '-horario_chegada')[:10]
@@ -39,14 +41,14 @@ def formulario_digitador(request):
 
             ocorrencia = form.save(commit=False)
 
-            # 🔧 CORREÇÃO 1: Pega o tipo de ocorrência do formulário
-            tipo_ocorrencia = form.cleaned_data.get('tipo_ocorrencia')
-            if tipo_ocorrencia == 'falta':
-                ocorrencia.faltou = True
-            else:
-                ocorrencia.faltou = False
+            # ðŸ”§ CORREÃ‡ÃƒO 1: Pega o tipo de ocorrÃªncia do formulÃ¡rio
+            tipo_ocorrencia = request.POST.get('tipo_ocorrencia', 'atraso')
+            if tipo_ocorrencia not in tipos_ocorrencia_permitidos:
+                tipo_ocorrencia = 'atraso'
+            ocorrencia.tipo_ocorrencia = tipo_ocorrencia
+            ocorrencia.faltou = False
 
-            # 🔧 CORREÇÃO 2: Pega o turno do formulário
+            # ðŸ”§ CORREÃ‡ÃƒO 2: Pega o turno do formulÃ¡rio
             ocorrencia.turno = form.cleaned_data.get('turno', 'manha')
 
             if ocorrencia.horario_chegada == '':
@@ -62,14 +64,14 @@ def formulario_digitador(request):
             request.session['ultima_turma_ocorrencia_id'] = turma.id
             request.session['ultima_turma_ocorrencia_nome'] = turma.nome
 
-            messages.success(request, f'Ocorrência registrada para {aluno.nome} (Turma {turma.nome}, Nº {numero})')
+            messages.success(request, f'OcorrÃªncia registrada para {aluno.nome} (Turma {turma.nome}, NÂº {numero})')
             return redirect('formulario_digitador')
         else:
-            messages.error(request, 'Erro no formulário. Verifique os dados.')
+            messages.error(request, 'Erro no formulÃ¡rio. Verifique os dados.')
     else:
         initial_data = {
             'data': ultima_data.isoformat(),
-            'faltou': True,
+            'faltou': False,
         }
         form = RegistroOcorrenciaForm(initial=initial_data)
         if ultima_turma:
@@ -83,7 +85,7 @@ def formulario_digitador(request):
     })
 
 # =============================================================================
-# IMPORTAÇÃO DE ALUNOS VIA EXCEL
+# IMPORTAÃ‡ÃƒO DE ALUNOS VIA EXCEL
 # =============================================================================
 from openpyxl import load_workbook
 from ..models import Turma, Aluno
@@ -99,15 +101,15 @@ def importar_alunos_excel(request):
         contador = 0
         erros = 0
 
-        for row in ws.iter_rows(min_row=2, values_only=True):  # Pula cabeçalho
+        for row in ws.iter_rows(min_row=2, values_only=True):  # Pula cabeÃ§alho
             try:
                 turma_nome = str(row[0]).strip() if row[0] else ''  # Coluna A: Turma (ex: 3A)
-                numero = int(row[1]) if row[1] else 0               # Coluna B: Número
+                numero = int(row[1]) if row[1] else 0               # Coluna B: NÃºmero
                 nome = str(row[2]).strip() if row[2] else ''        # Coluna C: Nome do aluno
 
                 if turma_nome and numero and nome:
-                    # Extrai a série do nome da turma (ex: 3A -> 3º Ano)
-                    serie = f"{turma_nome[0]}º Ano"
+                    # Extrai a sÃ©rie do nome da turma (ex: 3A -> 3Âº Ano)
+                    serie = f"{turma_nome[0]}Âº Ano"
 
                     # Busca ou cria a turma
                     turma, created = Turma.objects.get_or_create(
@@ -148,7 +150,7 @@ def cadastrar_aluno(request):
         form = AlunoForm(request.POST)
         if form.is_valid():
             form.save()
-            messages.success(request, '✅ Aluno cadastrado com sucesso!')
+            messages.success(request, 'âœ… Aluno cadastrado com sucesso!')
             return redirect('painel_equipe')
     else:
         form = AlunoForm()
@@ -171,7 +173,7 @@ def editar_aluno(request, aluno_id):
         form = AlunoEditForm(request.POST, instance=aluno)
         if form.is_valid():
             form.save()
-            messages.success(request, f'✅ Aluno {aluno.nome} atualizado!')
+            messages.success(request, f'âœ… Aluno {aluno.nome} atualizado!')
             return redirect('listar_alunos')
     else:
         form = AlunoEditForm(instance=aluno)
@@ -180,7 +182,7 @@ def editar_aluno(request, aluno_id):
 
 
 # =============================================================================
-# CADASTRO E EDIÇÃO DE ALUNOS (já existente)
+# CADASTRO E EDIÃ‡ÃƒO DE ALUNOS (jÃ¡ existente)
 # =============================================================================
 
 @login_required
@@ -191,7 +193,7 @@ def editar_aluno(request, aluno_id):
         form = AlunoEditForm(request.POST, instance=aluno)
         if form.is_valid():
             form.save()
-            messages.success(request, f'✅ Aluno {aluno.nome} atualizado!')
+            messages.success(request, f'âœ… Aluno {aluno.nome} atualizado!')
             return redirect('listar_alunos')
     else:
         form = AlunoEditForm(instance=aluno)

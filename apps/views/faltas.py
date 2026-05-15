@@ -105,13 +105,13 @@ def controle_faltas_alunos(request):
     ano = request.GET.get('ano', timezone.now().year)
 
     # Busca ocorrÃªncias do perÃ­odo
-    ocorrencias = RegistroOcorrenciaAluno.objects.filter(
+    faltas = RegistroFaltaAluno.objects.filter(
         data__month=mes,
         data__year=ano
-    ).select_related('aluno', 'aluno__turma').order_by('-data', '-horario_chegada')
+    ).select_related('aluno', 'aluno__turma').order_by('-data', 'aluno__turma__nome', 'aluno__numero')
 
     context = {
-        'ocorrencias': ocorrencias,
+        'faltas': faltas,
         'mes': mes,
         'ano': ano,
         'meses': range(1, 13),
