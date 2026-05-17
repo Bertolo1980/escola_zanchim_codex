@@ -5,71 +5,86 @@
 <div class="container-fluid px-2 px-md-4 py-3">
     <div class="card">
         <div class="card-header bg-primary text-white">
-            <h4><i class="fas fa-calendar-plus"></i> Agendar {{ laboratorio.nome }} - {{ laboratorio.equipamento }}</h4>
+            <h4><i class="fas fa-calendar-plus"></i> Agendar Laboratorio</h4>
         </div>
         <div class="card-body">
             <form method="post">
                 {% csrf_token %}
-                
-                <div class="row mb-3">
-                    <div class="col-md-4">
-                        <label class="form-label fw-bold">Data</label>
-                        <input type="date" name="data" class="form-control" required>
-                    </div>
-                    
-                    <div class="col-md-4">
-                        <label class="form-label fw-bold">Turno</label>
-                        <select name="turno" class="form-select" required>
-                            <option value="manha">Manhã</option>
-                            <option value="tarde">Tarde</option>
+
+                <div class="row mb-3 g-3">
+                    <div class="col-md-3">
+                        <label class="form-label fw-bold">Laboratorio</label>
+                        <select name="laboratorio" class="form-select" required>
+                            {% for lab in laboratorios_agendamento %}
+                                <option value="{{ lab.id }}" {% if lab.id == selected_laboratorio_id %}selected{% endif %}>
+                                    Laboratorio {{ forloop.counter }}
+                                </option>
+                            {% endfor %}
                         </select>
                     </div>
-                    
-                    <div class="col-md-4">
-                        <label class="form-label fw-bold">Horário</label>
+
+                    <div class="col-md-3">
+                        <label class="form-label fw-bold">Data</label>
+                        <input type="date" name="data" class="form-control" value="{{ form_data.data }}" required>
+                    </div>
+
+                    <div class="col-md-3">
+                        <label class="form-label fw-bold">Turno</label>
+                        <select name="turno" class="form-select" required>
+                            <option value="manha" {% if form_data.turno == 'manha' %}selected{% endif %}>Manha</option>
+                            <option value="tarde" {% if form_data.turno == 'tarde' %}selected{% endif %}>Tarde</option>
+                        </select>
+                    </div>
+
+                    <div class="col-md-3">
+                        <label class="form-label fw-bold">Horario</label>
                         <select name="horario" class="form-select" required>
-                            <option value="1">1ª Aula</option>
-                            <option value="2">2ª Aula</option>
-                            <option value="3">3ª Aula</option>
-                            <option value="4">4ª Aula</option>
-                            <option value="5">5ª Aula</option>
-                            <option value="6">6ª Aula</option>
+                            <option value="1" {% if form_data.horario == '1' %}selected{% endif %}>1a Aula</option>
+                            <option value="2" {% if form_data.horario == '2' %}selected{% endif %}>2a Aula</option>
+                            <option value="3" {% if form_data.horario == '3' %}selected{% endif %}>3a Aula</option>
+                            <option value="4" {% if form_data.horario == '4' %}selected{% endif %}>4a Aula</option>
+                            <option value="5" {% if form_data.horario == '5' %}selected{% endif %}>5a Aula</option>
+                            <option value="6" {% if form_data.horario == '6' %}selected{% endif %}>6a Aula</option>
                         </select>
                     </div>
                 </div>
-                
-                <div class="row mb-3">
+
+                <div class="row mb-3 g-3">
                     <div class="col-md-6">
                         <label class="form-label fw-bold">Professor</label>
                         <select name="professor" class="form-select" required>
                             <option value="">Selecione...</option>
                             {% for p in professores %}
-                            <option value="{{ p.id }}">{{ p.nome_completo }}</option>
+                                <option value="{{ p.id }}" {% if form_data.professor == p.id|stringformat:'s' %}selected{% endif %}>
+                                    {{ p.nome_completo }}
+                                </option>
                             {% endfor %}
                         </select>
                     </div>
-                    
+
                     <div class="col-md-6">
                         <label class="form-label fw-bold">Turma</label>
                         <select name="turma" class="form-select" required>
                             <option value="">Selecione...</option>
                             {% for t in turmas %}
-                            <option value="{{ t.id }}">{{ t.nome }}</option>
+                                <option value="{{ t.id }}" {% if form_data.turma == t.id|stringformat:'s' %}selected{% endif %}>
+                                    {{ t.nome }}
+                                </option>
                             {% endfor %}
                         </select>
                     </div>
                 </div>
-                
+
                 <div class="mb-3">
                     <label class="form-label fw-bold">Disciplina</label>
-                    <input type="text" name="disciplina" class="form-control" required>
+                    <input type="text" name="disciplina" class="form-control" value="{{ form_data.disciplina }}" required>
                 </div>
-                
+
                 <div class="mb-3">
-                    <label class="form-label fw-bold">Observação</label>
-                    <textarea name="observacao" class="form-control" rows="3"></textarea>
+                    <label class="form-label fw-bold">Observacao</label>
+                    <textarea name="observacao" class="form-control" rows="3">{{ form_data.observacao }}</textarea>
                 </div>
-                
+
                 <div class="d-flex justify-content-between">
                     <button type="submit" class="btn btn-success">
                         <i class="fas fa-save"></i> Salvar Agendamento

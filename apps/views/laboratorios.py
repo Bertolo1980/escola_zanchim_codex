@@ -1,4 +1,4 @@
-from .utilitarios import *
+﻿from .utilitarios import *
 
 # =============================================================================
 # GESTÃO DE LABORATÓRIOS E EMPRÉSTIMOS
@@ -8,6 +8,24 @@ from ..models import Laboratorio, ItemEquipamento, AgendamentoLab, Emprestimo
 from django.db.models import Q
 from django.urls import reverse
 from datetime import datetime, timedelta
+
+
+def _laboratorios_agendamento_queryset():
+    return Laboratorio.objects.filter(ativo=True).order_by('nome')
+
+
+def _contexto_agendamento(laboratorio, selected_laboratorio_id=None, form_data=None):
+    from ..models import Professor, Turma
+
+    return {
+        'laboratorio': laboratorio,
+        'laboratorios_agendamento': _laboratorios_agendamento_queryset(),
+        'selected_laboratorio_id': int(selected_laboratorio_id or laboratorio.id),
+        'form_data': form_data or {},
+        'professores': Professor.objects.filter(ativo=True),
+        'turmas': Turma.objects.filter(ativa=True),
+    }
+
 
 @login_required
 @user_passes_test(pertence_ao_grupo_equipe_diretiva, login_url='/')
@@ -45,9 +63,10 @@ def excluir_agendamento(request, agendamento_id):
 @user_passes_test(pertence_ao_grupo_equipe_diretiva, login_url='/')
 def agendamento_lab(request, lab_id):
     """Agendar laboratório fixo (Lab 01, 02, 03)"""
-    laboratorio = get_object_or_404(Laboratorio, id=lab_id, tipo='fixo')
+    laboratorio = get_object_or_404(Laboratorio, id=lab_id, ativo=True)
 
     if request.method == 'POST':
+        laboratorio_id = request.POST.get('laboratorio') or lab_id
         data = request.POST.get('data')
         horario = request.POST.get('horario')
         turno = request.POST.get('turno')
@@ -55,6 +74,16 @@ def agendamento_lab(request, lab_id):
         disciplina = request.POST.get('disciplina')
         turma_id = request.POST.get('turma')
         observacao = request.POST.get('observacao', '')
+        laboratorio = _laboratorios_agendamento_queryset().filter(id=laboratorio_id).first()
+
+        if not laboratorio:
+            laboratorio = get_object_or_404(Laboratorio, id=lab_id, ativo=True)
+            messages.error(request, 'Selecione um laboratorio valido.')
+            return render(request, 'laboratorios/agendar.html', _contexto_agendamento(
+                laboratorio,
+                selected_laboratorio_id=laboratorio.id,
+                form_data=request.POST,
+            ))
 
         # 1. Verificar se o mesmo professor já tem agendamento neste horário (em qualquer lab)
         conflito_professor = AgendamentoLab.objects.filter(
@@ -65,16 +94,12 @@ def agendamento_lab(request, lab_id):
         ).exists()
 
         if conflito_professor:
-            messages.error(request, '❌ Este professor já possui agendamento neste horário em outro laboratório!')
-            # Buscar dados para renderizar o formulário novamente
-            from ..models import Professor, Turma
-            professores = Professor.objects.filter(ativo=True)
-            turmas = Turma.objects.filter(ativa=True)
-            return render(request, 'laboratorios/agendar.html', {
-                'laboratorio': laboratorio,
-                'professores': professores,
-                'turmas': turmas,
-            })
+            messages.error(request, 'Este professor ja possui agendamento neste horario em outro laboratorio.')
+            return render(request, 'laboratorios/agendar.html', _contexto_agendamento(
+                laboratorio,
+                selected_laboratorio_id=laboratorio.id,
+                form_data=request.POST,
+            ))
 
         # 2. Verificar se o laboratório já está reservado neste horário
         conflito_lab = AgendamentoLab.objects.filter(
@@ -85,18 +110,14 @@ def agendamento_lab(request, lab_id):
         ).exists()
 
         if conflito_lab:
-            messages.error(request, f'❌ {laboratorio.nome} já está reservado neste horário!')
-            from ..models import Professor, Turma
-            professores = Professor.objects.filter(ativo=True)
-            turmas = Turma.objects.filter(ativa=True)
-            return render(request, 'laboratorios/agendar.html', {
-                'laboratorio': laboratorio,
-                'professores': professores,
-                'turmas': turmas,
-            })
+            messages.error(request, f'{laboratorio.nome} ja esta reservado neste horario.')
+            return render(request, 'laboratorios/agendar.html', _contexto_agendamento(
+                laboratorio,
+                selected_laboratorio_id=laboratorio.id,
+                form_data=request.POST,
+            ))
 
         # 3. Salvar agendamento
-        from ..models import Professor, Turma
         AgendamentoLab.objects.create(
             laboratorio=laboratorio,
             data=data,
@@ -111,16 +132,7 @@ def agendamento_lab(request, lab_id):
         messages.success(request, f'✅ {laboratorio.nome} agendado com sucesso!')
         return redirect('listar_laboratorios')
 
-    # GET - mostrar formulário
-    from ..models import Professor, Turma
-    professores = Professor.objects.filter(ativo=True)
-    turmas = Turma.objects.filter(ativa=True)
-
-    return render(request, 'laboratorios/agendar.html', {
-        'laboratorio': laboratorio,
-        'professores': professores,
-        'turmas': turmas,
-    })
+    return render(request, 'laboratorios/agendar.html', _contexto_agendamento(laboratorio))
 
 
 @login_required
@@ -134,33 +146,30 @@ def cronograma_semanal(request):
     if data_inicio:
         data_inicio = datetime.strptime(data_inicio, '%Y-%m-%d').date()
     else:
-        data_inicio = datetime.now().date()
+        data_inicio = AgendamentoLab.objects.order_by('-data', '-id').values_list('data', flat=True).first()
+        if not data_inicio:
+            data_inicio = datetime.now().date()
         data_inicio = data_inicio - timedelta(days=data_inicio.weekday())
 
     data_fim = data_inicio + timedelta(days=6)
 
-    # Capturar o filtro de turno (vindo do template)
+    # Capturar filtros opcionais
     turno_filtro = request.GET.get('turno', '')
-
+    laboratorio_filtro = request.GET.get('laboratorio', '')
     agendamentos = AgendamentoLab.objects.filter(
-        data__gte=data_inicio,
-        data__lte=data_fim
+        data__range=[data_inicio, data_fim],
     )
-
-    # Se não for superusuário nem membro da Equipe Diretiva,
-    # mostrar apenas os agendamentos do professor logado.
-    if not request.user.is_superuser and not request.user.groups.filter(
-            name__iexact='Equipe Diretiva'
-    ).exists():
-        agendamentos = agendamentos.filter(
-            professor__usuario=request.user
-        )
+    laboratorios_filtrados = _laboratorios_agendamento_queryset()
+    if laboratorio_filtro:
+        laboratorios_filtrados = laboratorios_filtrados.filter(id=laboratorio_filtro)
+        agendamentos = agendamentos.filter(laboratorio_id=laboratorio_filtro)
 
     # Aplicar filtro de turno se fornecido
     if turno_filtro in ['manha', 'tarde']:
         agendamentos = agendamentos.filter(turno=turno_filtro)
 
-    agendamentos = agendamentos.select_related('laboratorio', 'professor', 'turma').order_by('data', 'horario')
+    agendamentos = agendamentos.select_related('laboratorio', 'professor', 'turma').order_by('-data', '-id')
+    agendamentos_recentes = agendamentos
 
     # Mapa de dias em português
     mapa_dias = {
@@ -177,20 +186,43 @@ def cronograma_semanal(request):
         dia_en = a.data.strftime('%A')
         dia_pt = mapa_dias.get(dia_en, dia_en)
         key = (a.laboratorio.id, dia_pt, a.horario)
-        agendamentos_dict[key] = a
+        agendamentos_dict.setdefault(key, []).append(a)
 
     dias_semana = ['Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira']
     horarios = ['1', '2', '3', '4', '5', '6']
+
+    cronograma_por_laboratorio = []
+    for laboratorio in laboratorios_filtrados:
+        linhas = []
+        for horario in horarios:
+            linhas.append({
+                'horario': horario,
+                'dias': [
+                    {
+                        'nome': dia,
+                        'agendamentos': agendamentos_dict.get((laboratorio.id, dia, horario), []),
+                    }
+                    for dia in dias_semana
+                ],
+            })
+        cronograma_por_laboratorio.append({
+            'laboratorio': laboratorio,
+            'linhas': linhas,
+        })
 
     context = {
         'dias_semana': dias_semana,
         'horarios': horarios,
         'agendamentos_dict': agendamentos_dict,
-        'laboratorios': Laboratorio.objects.filter(tipo='fixo', ativo=True),
+        'laboratorios': _laboratorios_agendamento_queryset(),
+        'cronograma_por_laboratorio': cronograma_por_laboratorio,
+        'agendamentos_recentes': agendamentos_recentes,
         'data_inicio': data_inicio,
         'data_fim': data_fim,
         'semana_anterior': data_inicio - timedelta(days=7),
         'semana_proxima': data_inicio + timedelta(days=7),
+        'turno_filtro': turno_filtro,
+        'laboratorio_filtro': laboratorio_filtro,
     }
     return render(request, 'laboratorios/cronograma.html', context)
 

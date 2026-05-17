@@ -49,12 +49,21 @@
                 <div class="mb-3">
                     <label class="form-label fw-bold">Tipo de Ocorrência</label>
                     <select name="tipo_ocorrencia" class="form-select" required>
-                        <option value="atraso">⏰ Atraso</option>
-                        <option value="uniforme">👕 Uniforme</option>
-                        <option value="piercing">💍 Piercing</option>
-                        <option value="cabelo">💇 Cabelo</option>
-                        <option value="desvio_normas">⚠️ Desvio de Normas</option>
+                        <option value="atraso">Atraso</option>
+                        <option value="uniforme">Uniforme</option>
+                        <option value="piercing">Piercing</option>
+                        <option value="cabelo">Cabelo</option>
+                        <option value="desvio_normas">Desvio de normas</option>
+                        <option value="fora_sala">Fora de sala sem autorizacao</option>
+                        <option value="matando_aula">Matando aula</option>
                     </select>
+                </div>
+
+                <div class="form-check mb-3">
+                    <input class="form-check-input" type="checkbox" name="confirmar_reenvio_whatsapp" value="1" id="confirmar_reenvio_whatsapp">
+                    <label class="form-check-label" for="confirmar_reenvio_whatsapp">
+                        Enviar novo aviso pelo WhatsApp se for reincidencia do mesmo tipo hoje
+                    </label>
                 </div>
 
                 <!-- TURNO (NOVO) -->

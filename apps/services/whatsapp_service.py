@@ -165,3 +165,12 @@ def enviar_template_aviso_falta_aluno(numero, nome_aluno, data_falta):
         idioma='pt_BR',
         parametros=[nome_aluno, data_falta],
     )
+
+
+def enviar_template_aviso_ocorrencia_aluno(numero, nome_aluno, tipo_ocorrencia, data_ocorrencia):
+    return enviar_template_whatsapp(
+        numero=numero,
+        nome_template='aviso_ocorrencia_aluno',
+        idioma='pt_BR',
+        parametros=[nome_aluno, tipo_ocorrencia, data_ocorrencia],
+    )

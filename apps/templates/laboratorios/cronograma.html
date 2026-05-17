@@ -1,94 +1,280 @@
 {% extends 'base.html' %}
 {% block title %}Cronograma Semanal{% endblock %}
 
+{% block extra_head %}
+<style>
+    .cronograma-labs .toolbar-actions,
+    .cronograma-labs .toolbar-filters,
+    .cronograma-labs .week-nav {
+        min-width: 0;
+    }
+
+    .cronograma-labs .form-select,
+    .cronograma-labs .btn {
+        min-height: 42px;
+    }
+
+    .schedule-table-wrap {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .schedule-table {
+        table-layout: fixed;
+        min-width: 980px;
+    }
+
+    .schedule-table th,
+    .schedule-table td,
+    .summary-table th,
+    .summary-table td {
+        white-space: normal;
+        overflow-wrap: anywhere;
+        word-break: normal;
+        vertical-align: top;
+    }
+
+    .schedule-table th:first-child,
+    .schedule-table td:first-child {
+        width: 90px;
+    }
+
+    .schedule-item,
+    .mobile-schedule-card,
+    .mobile-summary-card {
+        overflow-wrap: anywhere;
+        word-break: normal;
+    }
+
+    .schedule-item {
+        line-height: 1.25;
+    }
+
+    .mobile-schedule-grid,
+    .mobile-summary-grid {
+        display: grid;
+        gap: 0.75rem;
+    }
+
+    .mobile-schedule-card,
+    .mobile-summary-card {
+        border: 1px solid rgba(0, 0, 0, 0.12);
+        border-left: 4px solid #0d6efd;
+        border-radius: 0.5rem;
+        padding: 0.85rem;
+        background: #fff;
+    }
+
+    .mobile-card-meta {
+        color: #495057;
+        font-size: 0.9rem;
+    }
+
+    @media (max-width: 575.98px) {
+        .cronograma-labs .card-body {
+            padding: 0.85rem;
+        }
+
+        .cronograma-labs .card-header h4 {
+            font-size: 1.05rem;
+            line-height: 1.35;
+        }
+
+        .cronograma-labs .btn,
+        .cronograma-labs .form-select {
+            width: 100%;
+        }
+    }
+</style>
+{% endblock %}
+
 {% block content %}
-<div class="container-fluid px-2 px-md-4 py-3">
+<div class="cronograma-labs container-fluid px-2 px-md-4 py-3">
     <div class="card">
         <div class="card-header bg-primary text-white">
-            <h4><i class="fas fa-calendar-alt"></i> Cronograma Semanal - Laboratórios Fixos</h4>
+            <h4><i class="fas fa-calendar-alt"></i> Cronograma Semanal - Laboratorios</h4>
         </div>
-                 <!-- BOTÕES DE IMPRESSÃO E EXPORTAÇÃO -->
-            <div class="mb-3 text-end">
-<a href="{% url 'cronograma_print' %}?data_inicio={{ data_inicio|date:'Y-m-d' }}&turno={{ turno_filtro }}"
-   target="_blank"
-   class="btn btn-info">
-    <i class="fas fa-print"></i> Imprimir / PDF
-</a>
-                <a href="{% url 'exportar_cronograma_excel' %}?data_inicio={{ data_inicio|date:'Y-m-d' }}{% if request.GET.turno %}&turno={{ request.GET.turno }}{% endif %}" class="btn btn-success">
-                <i class="fas fa-file-excel"></i> Exportar para Excel
-                </a>
+
+        <div class="card-body">
+            <div class="d-flex flex-column flex-lg-row justify-content-between gap-3 mb-3">
+                <div class="toolbar-actions d-flex flex-column flex-sm-row gap-2">
+                    <a href="{% url 'cronograma_print' %}?data_inicio={{ data_inicio|date:'Y-m-d' }}&turno={{ turno_filtro }}{% if laboratorio_filtro %}&laboratorio={{ laboratorio_filtro }}{% endif %}"
+                       target="_blank"
+                       class="btn btn-info">
+                        <i class="fas fa-print"></i> Imprimir / PDF
+                    </a>
+                    <a href="{% url 'exportar_cronograma_excel' %}?data_inicio={{ data_inicio|date:'Y-m-d' }}{% if turno_filtro %}&turno={{ turno_filtro }}{% endif %}{% if laboratorio_filtro %}&laboratorio={{ laboratorio_filtro }}{% endif %}"
+                       class="btn btn-success">
+                        <i class="fas fa-file-excel"></i> Exportar para Excel
+                    </a>
+                </div>
+
+                <div class="toolbar-filters d-flex flex-column flex-sm-row gap-2">
+                    <select name="laboratorio" id="filtroLaboratorio" class="form-select">
+                        <option value="">Todos os laboratorios</option>
+                        {% for lab in laboratorios %}
+                            <option value="{{ lab.id }}" {% if laboratorio_filtro == lab.id|stringformat:'s' %}selected{% endif %}>
+                                {{ lab.nome }}
+                            </option>
+                        {% endfor %}
+                    </select>
+
+                    <select name="turno" id="filtroTurno" class="form-select">
+                        <option value="">Todos os turnos</option>
+                        <option value="manha" {% if turno_filtro == 'manha' %}selected{% endif %}>Manha</option>
+                        <option value="tarde" {% if turno_filtro == 'tarde' %}selected{% endif %}>Tarde</option>
+                    </select>
+                </div>
             </div>
 
-            <div class="mb-3">
-        <label class="form-label fw-bold me-2">Turno:</label>
-        <select name="turno" id="filtroTurno" class="form-select w-auto d-inline-block">
-            <option value="">Todos</option>
-            <option value="manha" {% if request.GET.turno == 'manha' %}selected{% endif %}>Manhã</option>
-            <option value="tarde" {% if request.GET.turno == 'tarde' %}selected{% endif %}>Tarde</option>
-        </select>
-    </div>
-
-
-                <div class="d-flex justify-content-between mb-4">
-                <a href="?data_inicio={{ semana_anterior|date:'Y-m-d' }}" class="btn btn-secondary">
+            <div class="week-nav d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-2 mb-4">
+                <a href="?data_inicio={{ semana_anterior|date:'Y-m-d' }}{% if turno_filtro %}&turno={{ turno_filtro }}{% endif %}{% if laboratorio_filtro %}&laboratorio={{ laboratorio_filtro }}{% endif %}"
+                   class="btn btn-secondary">
                     <i class="fas fa-chevron-left"></i> Semana Anterior
                 </a>
-                <span class="fw-bold">Semana de {{ data_inicio|date:"d/m/Y" }} a {{ data_fim|date:"d/m/Y" }}</span>
-                <a href="?data_inicio={{ semana_proxima|date:'Y-m-d' }}" class="btn btn-secondary">
-                    Próxima Semana <i class="fas fa-chevron-right"></i>
+                <span class="fw-bold text-center">
+                    Semana de {{ data_inicio|date:"d/m/Y" }} a {{ data_fim|date:"d/m/Y" }}
+                </span>
+                <a href="?data_inicio={{ semana_proxima|date:'Y-m-d' }}{% if turno_filtro %}&turno={{ turno_filtro }}{% endif %}{% if laboratorio_filtro %}&laboratorio={{ laboratorio_filtro }}{% endif %}"
+                   class="btn btn-secondary">
+                    Proxima Semana <i class="fas fa-chevron-right"></i>
                 </a>
             </div>
 
-            <div class="table-responsive">
-                <table class="table table-bordered text-center">
-                    <thead>
-                        <tr class="table-dark">
-                            <th style="width: 80px;">Horário</th>
-                            {% for lab in laboratorios %}
-                                <th colspan="5" style="background-color: {% cycle '#e74c3c' '#3498db' '#2ecc71' %}; color: white;">
-                                    {{ lab.nome }}
-                                </th>
-                            {% endfor %}
-                        </tr>
-                        <tr class="table-secondary">
-                            <th></th>
-                            {% for lab in laboratorios %}
-                                {% for dia in dias_semana %}
-                                    <th>{{ dia|slice:":-3" }}</th>
-                                {% endfor %}
-                            {% endfor %}
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for horario in horarios %}
-                        <tr>
-                            <td class="fw-bold bg-light">{{ horario }}ª Aula</td>
-                            {% for lab in laboratorios %}
-                                {% for dia in dias_semana %}
-                                    <td style="background-color: {% cycle '#f9ebea' '#eaf2f8' '#eafaf1' %}">
-                                        {% for k, a in agendamentos_dict.items %}
-                                            {% if k.0 == lab.id and k.1 == dia and k.2 == horario %}
-                                                <div class="p-1 rounded" style="background-color: {% cycle '#e74c3c' '#3498db' '#2ecc71' %}; color: white;">
-                                                    <strong>{{ a.disciplina }}</strong><br>
-                                                    {{ a.turma.nome }}<br>
-                                                   <small>{{ a.professor.nome_abreviado|truncatechars:20 }}</small>
-                                                    <br>
-                                                    <a href="{% url 'excluir_agendamento' a.id %}?data_inicio={{ data_inicio|date:'Y-m-d' }}"
-                                                       class="btn btn-danger btn-sm mt-1"
-                                                       onclick="return confirm('Excluir este agendamento?')"
-                                                       style="font-size: 0.7rem; padding: 1px 5px;">
-                                                        <i class="fas fa-trash-alt"></i> Excluir
-                                                    </a>
-                                                </div>
-                                            {% endif %}
+            {% for secao in cronograma_por_laboratorio %}
+                <section class="mb-4">
+                    <h5 class="bg-dark text-white p-2 rounded mb-0">{{ secao.laboratorio.nome }}</h5>
+                    <div class="schedule-table-wrap table-responsive d-none d-lg-block">
+                        <table class="schedule-table table table-bordered align-middle text-center mb-0">
+                            <thead class="table-secondary">
+                                <tr>
+                                    <th style="width: 90px;">Horario</th>
+                                    {% for dia in dias_semana %}
+                                        <th>{{ dia }}</th>
+                                    {% endfor %}
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for linha in secao.linhas %}
+                                    <tr>
+                                        <td class="fw-bold bg-light">{{ linha.horario }}a Aula</td>
+                                        {% for item in linha.dias %}
+                                            <td>
+                                                {% if item.agendamentos %}
+                                                    {% for agendamento in item.agendamentos %}
+                                                        <div class="schedule-item p-2 rounded bg-primary text-white text-start mb-2">
+                                                            <strong>{{ agendamento.disciplina }}</strong><br>
+                                                            <span>Professor: {{ agendamento.professor.nome_completo }}</span><br>
+                                                            <span>Turma: {{ agendamento.turma.nome }}</span><br>
+                                                            <small>{{ agendamento.data|date:"d/m/Y" }} - {{ agendamento.get_turno_display }}</small>
+                                                            {% if agendamento.observacao %}
+                                                                <br><small>{{ agendamento.observacao }}</small>
+                                                            {% endif %}
+                                                            <br>
+                                                            <a href="{% url 'excluir_agendamento' agendamento.id %}?data_inicio={{ data_inicio|date:'Y-m-d' }}"
+                                                               class="btn btn-danger btn-sm mt-2"
+                                                               onclick="return confirm('Excluir este agendamento?')">
+                                                                <i class="fas fa-trash-alt"></i> Excluir
+                                                            </a>
+                                                        </div>
+                                                    {% endfor %}
+                                                {% else %}
+                                                    <span class="text-muted">-</span>
+                                                {% endif %}
+                                            </td>
                                         {% endfor %}
-                                    </td>
+                                    </tr>
                                 {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="mobile-schedule-grid d-lg-none mt-3">
+                        {% for linha in secao.linhas %}
+                            {% for item in linha.dias %}
+                                {% if item.agendamentos %}
+                                    {% for agendamento in item.agendamentos %}
+                                        <div class="mobile-schedule-card">
+                                            <div class="d-flex flex-column flex-sm-row justify-content-between gap-1 mb-2">
+                                                <strong>{{ item.nome }}</strong>
+                                                <span class="badge bg-primary align-self-start">{{ linha.horario }}a Aula</span>
+                                            </div>
+                                            <div class="fw-semibold">{{ agendamento.disciplina }}</div>
+                                            <div class="mobile-card-meta">Professor: {{ agendamento.professor.nome_completo }}</div>
+                                            <div class="mobile-card-meta">Turma: {{ agendamento.turma.nome }}</div>
+                                            <div class="mobile-card-meta">Data: {{ agendamento.data|date:"d/m/Y" }}</div>
+                                            <div class="mobile-card-meta">Turno: {{ agendamento.get_turno_display }}</div>
+                                            {% if agendamento.observacao %}
+                                                <div class="mobile-card-meta">Observacao: {{ agendamento.observacao }}</div>
+                                            {% endif %}
+                                            <a href="{% url 'excluir_agendamento' agendamento.id %}?data_inicio={{ data_inicio|date:'Y-m-d' }}"
+                                               class="btn btn-outline-danger btn-sm mt-2"
+                                               onclick="return confirm('Excluir este agendamento?')">
+                                                <i class="fas fa-trash-alt"></i> Excluir
+                                            </a>
+                                        </div>
+                                    {% endfor %}
+                                {% endif %}
                             {% endfor %}
-                        </tr>
                         {% endfor %}
-                    </tbody>
-                </table>
+                    </div>
+                </section>
+            {% empty %}
+                <div class="alert alert-info">Nenhum laboratorio encontrado para o filtro selecionado.</div>
+            {% endfor %}
+
+            <div class="mt-4">
+                <h5 class="mb-3">Agendamentos da semana</h5>
+                <div class="table-responsive d-none d-md-block">
+                    <table class="summary-table table table-striped table-hover align-middle">
+                        <thead>
+                            <tr>
+                                <th>Data</th>
+                                <th>Laboratorio</th>
+                                <th>Horario</th>
+                                <th>Turno</th>
+                                <th>Professor</th>
+                                <th>Turma</th>
+                                <th>Disciplina</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for a in agendamentos_recentes %}
+                                <tr>
+                                    <td>{{ a.data|date:"d/m/Y" }}</td>
+                                    <td>{{ a.laboratorio.nome }}</td>
+                                    <td>{{ a.horario }}a Aula</td>
+                                    <td>{{ a.get_turno_display }}</td>
+                                    <td>{{ a.professor.nome_completo }}</td>
+                                    <td>{{ a.turma.nome }}</td>
+                                    <td>{{ a.disciplina }}</td>
+                                </tr>
+                            {% empty %}
+                                <tr>
+                                    <td colspan="7" class="text-muted">Nenhum agendamento encontrado para esta semana.</td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="mobile-summary-grid d-md-none">
+                    {% for a in agendamentos_recentes %}
+                        <div class="mobile-summary-card">
+                            <div class="d-flex justify-content-between gap-2 mb-2">
+                                <strong>{{ a.laboratorio.nome }}</strong>
+                                <span class="badge bg-secondary">{{ a.horario }}a Aula</span>
+                            </div>
+                            <div class="fw-semibold">{{ a.disciplina }}</div>
+                            <div class="mobile-card-meta">Data: {{ a.data|date:"d/m/Y" }}</div>
+                            <div class="mobile-card-meta">Turno: {{ a.get_turno_display }}</div>
+                            <div class="mobile-card-meta">Professor: {{ a.professor.nome_completo }}</div>
+                            <div class="mobile-card-meta">Turma: {{ a.turma.nome }}</div>
+                        </div>
+                    {% empty %}
+                        <div class="alert alert-info mb-0">Nenhum agendamento encontrado para esta semana.</div>
+                    {% endfor %}
+                </div>
             </div>
 
             <div class="mt-4">
@@ -100,64 +286,36 @@
     </div>
 </div>
 
-<style media="print">
-    /* Mostra tudo na impressão */
-    * {
-        visibility: visible !important;
-        background-color: transparent !important;
-        color: black !important;
-    }
-
-    .btn, .card-header, .d-flex, .mt-4, .mb-3, .mb-4, .navbar, footer, .actions {
-        display: none !important;
-    }
-
-    /* Garante que a tabela seja impressa como tabela */
-    .table, table, tbody, tr, td, th, thead {
-        display: table !important;
-        width: 100% !important;
-        border-collapse: collapse !important;
-    }
-
-    th, td {
-        border: 1px solid black !important;
-        padding: 4px !important;
-        text-align: center !important;
-        vertical-align: middle !important;
-    }
-
-    /* Força paisagem e remove margens */
-    @page {
-        size: landscape;
-        margin: 0.5cm;
-    }
-
-    body {
-        margin: 0;
-        padding: 0;
-    }
-
-    .container-fluid {
-        padding: 0;
-        margin: 0;
-    }
-</style>
-
 <script>
     document.addEventListener('DOMContentLoaded', function() {
         const filtroTurno = document.getElementById('filtroTurno');
+        const filtroLaboratorio = document.getElementById('filtroLaboratorio');
+
+        function aplicarFiltros() {
+            const url = new URL(window.location.href);
+
+            if (filtroTurno && filtroTurno.value) {
+                url.searchParams.set('turno', filtroTurno.value);
+            } else {
+                url.searchParams.delete('turno');
+            }
+
+            if (filtroLaboratorio && filtroLaboratorio.value) {
+                url.searchParams.set('laboratorio', filtroLaboratorio.value);
+            } else {
+                url.searchParams.delete('laboratorio');
+            }
+
+            window.location.href = url;
+        }
+
         if (filtroTurno) {
-            filtroTurno.addEventListener('change', function() {
-                const url = new URL(window.location.href);
-                if (this.value) {
-                    url.searchParams.set('turno', this.value);
-                } else {
-                    url.searchParams.delete('turno');
-                }
-                window.location.href = url;
-            });
+            filtroTurno.addEventListener('change', aplicarFiltros);
+        }
+
+        if (filtroLaboratorio) {
+            filtroLaboratorio.addEventListener('change', aplicarFiltros);
         }
     });
 </script>
-
 {% endblock %}
