@@ -5,12 +5,14 @@ from apps.services.whatsapp_service import (
     enviar_template_aviso_falta_aluno,
     enviar_template_aviso_ocorrencia_aluno,
 )
+from django.db import transaction
 
 logger = logging.getLogger(__name__)
 
-TIPOS_OCORRENCIA_WHATSAPP = {'piercing', 'desvio_normas', 'cabelo', 'uniforme', 'fora_sala', 'matando_aula'}
+TIPOS_OCORRENCIA_WHATSAPP = {'atraso', 'piercing', 'desvio_normas', 'cabelo', 'uniforme', 'fora_sala', 'matando_aula'}
 TIPOS_OCORRENCIA_REINCIDENCIA = {'piercing', 'desvio_normas', 'cabelo', 'uniforme'}
 TIPOS_OCORRENCIA_LABELS = {
+    'atraso': 'Atraso',
     'piercing': 'Uso de Piercing',
     'desvio_normas': 'Desvio de Normas',
     'cabelo': 'Cabelo',
@@ -43,7 +45,8 @@ def _tipo_ocorrencia_whatsapp(tipo_ocorrencia):
 
 
 def _enviar_aviso_ocorrencia_whatsapp(request, aluno, tipo_ocorrencia, data_ocorrencia, mensagem_sucesso=None):
-    if tipo_ocorrencia == 'falta' or tipo_ocorrencia not in TIPOS_OCORRENCIA_WHATSAPP:
+    tipo_normalizado = (tipo_ocorrencia or '').strip().lower()
+    if tipo_normalizado == 'falta' or tipo_normalizado not in TIPOS_OCORRENCIA_WHATSAPP:
         return
 
     telefone = _telefone_whatsapp_aluno(aluno)
@@ -53,7 +56,7 @@ def _enviar_aviso_ocorrencia_whatsapp(request, aluno, tipo_ocorrencia, data_ocor
             extra={
                 'aluno': aluno.nome,
                 'aluno_id': aluno.id,
-                'tipo_ocorrencia': tipo_ocorrencia,
+                'tipo_ocorrencia': tipo_normalizado,
                 'data_ocorrencia': str(data_ocorrencia),
             },
         )
@@ -64,7 +67,7 @@ def _enviar_aviso_ocorrencia_whatsapp(request, aluno, tipo_ocorrencia, data_ocor
     resultado_whatsapp = enviar_template_aviso_ocorrencia_aluno(
         telefone,
         aluno.nome,
-        _tipo_ocorrencia_whatsapp(tipo_ocorrencia),
+        _tipo_ocorrencia_whatsapp(tipo_normalizado),
         data_formatada,
     )
 
@@ -78,7 +81,7 @@ def _enviar_aviso_ocorrencia_whatsapp(request, aluno, tipo_ocorrencia, data_ocor
             'aluno': aluno.nome,
             'aluno_id': aluno.id,
             'numero_usado': resultado_whatsapp.get('numero') or telefone,
-            'tipo_ocorrencia': tipo_ocorrencia,
+            'tipo_ocorrencia': tipo_normalizado,
             'data_ocorrencia': str(data_ocorrencia),
             'erro_whatsapp': resultado_whatsapp.get('erro'),
             'resposta_whatsapp': resultado_whatsapp.get('resposta'),
@@ -766,10 +769,11 @@ def registrar_ocorrencia_aluno(request):
 
             ocorrencia = form.save(commit=False)
             tipo_ocorrencia = request.POST.get('tipo_ocorrencia', 'atraso')
-            if tipo_ocorrencia not in tipos_ocorrencia_permitidos:
-                tipo_ocorrencia = 'atraso'
+            tipo_normalizado = (tipo_ocorrencia or '').strip().lower()
+            if tipo_normalizado not in tipos_ocorrencia_permitidos:
+                tipo_normalizado = 'atraso'
             enviar_reincidencia = request.POST.get('enviar_whatsapp_reincidencia') == 'sim'
-            ocorrencia.tipo_ocorrencia = tipo_ocorrencia
+            ocorrencia.tipo_ocorrencia = tipo_normalizado
             ocorrencia.observacoes_adicionais = request.POST.get('observacoes_adicionais', '')
             ocorrencia.atendido_por = pedagoga
             ocorrencia.turno = aluno.turma.turno
@@ -783,13 +787,14 @@ def registrar_ocorrencia_aluno(request):
             try:
                 ocorrencia.aluno = aluno
                 ocorrencia.registrado_por = request.user
-                ocorrencia.save()
+                with transaction.atomic():
+                    ocorrencia.save()
             except IntegrityError:
-                if tipo_ocorrencia in TIPOS_OCORRENCIA_REINCIDENCIA and enviar_reincidencia:
+                if tipo_normalizado in TIPOS_OCORRENCIA_REINCIDENCIA and enviar_reincidencia:
                     _enviar_aviso_ocorrencia_whatsapp(
                         request,
                         aluno,
-                        tipo_ocorrencia,
+                        tipo_normalizado,
                         ocorrencia.data,
                         mensagem_sucesso='Novo aviso de reincidencia enviado pelo WhatsApp.',
                     )
@@ -801,11 +806,11 @@ def registrar_ocorrencia_aluno(request):
             request.session['ultima_data_ocorrencia'] = ocorrencia.data.isoformat()
             request.session['ultima_turma_ocorrencia_id'] = turma.id
             request.session['ultima_turma_ocorrencia_nome'] = turma.nome
-            request.session['ultimo_tipo_ocorrencia'] = tipo_ocorrencia
+            request.session['ultimo_tipo_ocorrencia'] = tipo_normalizado
             request.session['ultimo_turno'] = request.POST.get('turno', 'manha')
 
             messages.success(request, f'Ocorrencia registrada para {aluno.nome} (Turma {turma.nome}, No {numero})')
-            _enviar_aviso_ocorrencia_whatsapp(request, aluno, tipo_ocorrencia, ocorrencia.data)
+            _enviar_aviso_ocorrencia_whatsapp(request, aluno, tipo_normalizado, ocorrencia.data)
             return redirect('registrar_ocorrencia_aluno')
         else:
             messages.error(request, 'Erro no formulario. Verifique os dados.')
