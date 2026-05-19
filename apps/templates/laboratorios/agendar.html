@@ -10,6 +10,16 @@
         <div class="card-body">
             <form method="post">
                 {% csrf_token %}
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Laboratorio</label>
+                    <select id="selecionarLaboratorio" class="form-select">
+                        {% for lab in laboratorios %}
+                            <option value="{% url 'agendamento_lab' lab.id %}" {% if lab.id == laboratorio.id %}selected{% endif %}>
+                                {{ lab.nome }} - {{ lab.equipamento }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
                 
                 <div class="row mb-3">
                     <div class="col-md-4">
@@ -20,20 +30,20 @@
                     <div class="col-md-4">
                         <label class="form-label fw-bold">Turno</label>
                         <select name="turno" class="form-select" required>
-                            <option value="manha">Manhã</option>
+                            <option value="manha">Manha</option>
                             <option value="tarde">Tarde</option>
                         </select>
                     </div>
                     
                     <div class="col-md-4">
-                        <label class="form-label fw-bold">Horário</label>
+                        <label class="form-label fw-bold">Horario</label>
                         <select name="horario" class="form-select" required>
-                            <option value="1">1ª Aula</option>
-                            <option value="2">2ª Aula</option>
-                            <option value="3">3ª Aula</option>
-                            <option value="4">4ª Aula</option>
-                            <option value="5">5ª Aula</option>
-                            <option value="6">6ª Aula</option>
+                            <option value="1">1 Aula</option>
+                            <option value="2">2 Aula</option>
+                            <option value="3">3 Aula</option>
+                            <option value="4">4 Aula</option>
+                            <option value="5">5 Aula</option>
+                            <option value="6">6 Aula</option>
                         </select>
                     </div>
                 </div>
@@ -66,7 +76,7 @@
                 </div>
                 
                 <div class="mb-3">
-                    <label class="form-label fw-bold">Observação</label>
+                    <label class="form-label fw-bold">Observacao</label>
                     <textarea name="observacao" class="form-control" rows="3"></textarea>
                 </div>
                 
@@ -82,4 +92,15 @@
         </div>
     </div>
 </div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const seletor = document.getElementById('selecionarLaboratorio');
+        if (seletor) {
+            seletor.addEventListener('change', function() {
+                window.location.href = this.value;
+            });
+        }
+    });
+</script>
 {% endblock %}

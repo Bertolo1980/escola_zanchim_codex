@@ -2,9 +2,7 @@
 <html>
 <head>
     <meta charset="UTF-8">
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-    <title>Cronograma Semanal - Impressão</title>
+    <title>Cronograma Semanal - Impressao</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -13,7 +11,17 @@
 
         .cabecalho {
             text-align: center;
-            margin-bottom: 20px;
+            margin-bottom: 18px;
+        }
+
+        .lab-schedule {
+            page-break-inside: avoid;
+            margin-bottom: 18px;
+        }
+
+        .lab-title {
+            font-weight: bold;
+            margin-bottom: 6px;
         }
 
         table {
@@ -37,6 +45,7 @@
             .menu-principal {
                 display: none !important;
             }
+
             body {
                 margin: 5mm;
             }
@@ -46,51 +55,54 @@
 <body>
     {% include 'includes/menu_principal.html' %}
     <div class="cabecalho">
-        <h3>Cronograma Semanal - Laboratórios Fixos</h3>
+        <h3>Cronograma Semanal - Laboratorios</h3>
         <p>Semana de {{ data_inicio|date:"d/m/Y" }} a {{ data_fim|date:"d/m/Y" }}</p>
+        <p>
+            Laboratorio:
+            {% if laboratorio_filtro %}
+                {% for lab in laboratorios_todos %}{% if laboratorio_filtro == lab.id|stringformat:"s" %}{{ lab.nome }}{% endif %}{% endfor %}
+            {% else %}
+                Todos
+            {% endif %}
+            |
+            Turno:
+            {% if turno_filtro == 'manha' %}Manha{% elif turno_filtro == 'tarde' %}Tarde{% else %}Todos{% endif %}
+        </p>
     </div>
 
-    <div class="table-responsive">
-    <table>
-        <thead>
-            <tr>
-                <th>Horário</th>
-                {% for lab in laboratorios %}
-                    <th colspan="5">{{ lab.nome }}</th>
-                {% endfor %}
-            </tr>
-            <tr>
-                <th></th>
-                {% for lab in laboratorios %}
-                    {% for dia in dias_semana %}
-                        <th>{{ dia|slice:":-3" }}</th>
-                    {% endfor %}
-                {% endfor %}
-            </tr>
-        </thead>
-
-        <tbody>
-            {% for horario in horarios %}
-            <tr>
-                <td><strong>{{ horario }}ª Aula</strong></td>
-
-                {% for lab in laboratorios %}
-                    {% for dia in dias_semana %}
-                        <td>
-                            {% for k, a in agendamentos_dict.items %}
-                                {% if k.0 == lab.id and k.1 == dia and k.2 == horario %}
-                                    <strong>{{ a.disciplina }}</strong><br>
-                                    {{ a.turma.nome }}<br>
-                                    <small>{{ a.professor.nome_abreviado|truncatechars:20 }}</small>
-                                {% endif %}
+    {% for lab in laboratorios %}
+        <section class="lab-schedule">
+            <div class="lab-title">{{ lab.nome }} - {{ lab.equipamento }}</div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Aula</th>
+                        {% for dia in dias_semana %}
+                            <th>{{ dia }}</th>
+                        {% endfor %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for slot in slots_cronograma %}
+                        <tr>
+                            <td><strong>{{ slot.horario_label }}</strong><br><small>{{ slot.turno_label }}</small></td>
+                            {% for dia in dias_semana %}
+                                <td>
+                                    {% for k, a in agendamentos_dict.items %}
+                                        {% if k.0 == lab.id and k.1 == dia and k.2 == slot.turno and k.3 == slot.horario %}
+                                            <strong>{{ a.disciplina }}</strong><br>
+                                            {{ a.turma.nome }}<br>
+                                            <small>{{ a.professor.nome_abreviado|truncatechars:24 }}</small>
+                                            {% if a.observacao %}<br><small>{{ a.observacao }}</small>{% endif %}
+                                        {% endif %}
+                                    {% endfor %}
+                                </td>
                             {% endfor %}
-                        </td>
+                        </tr>
                     {% endfor %}
-                {% endfor %}
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-    </div>
+                </tbody>
+            </table>
+        </section>
+    {% endfor %}
 </body>
 </html>
