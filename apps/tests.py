@@ -262,6 +262,99 @@ class FaltasOcorrenciasSeparacaoTests(TestCase):
         self.assertContains(response, 'Ocorrencia registrada, mas nao ha telefone cadastrado.')
         self.assertIn('aluno sem telefone cadastrado', '\n'.join(logs.output))
 
+    def _post_ocorrencia_digitador(self, tipo_ocorrencia, follow=True, enviar_reincidencia=''):
+        self.client.force_login(self.user)
+        return self.client.post(
+            reverse('formulario_digitador'),
+            {
+                'turma': self.turma.pk,
+                'numero_aluno': self.aluno.numero,
+                'nome_aluno': self.aluno.nome,
+                'data': '2026-05-15',
+                'turno': 'manha',
+                'faltou': '',
+                'tipo_ocorrencia': tipo_ocorrencia,
+                'motivo_alegado': 'Teste de ocorrencia',
+                'atendido_por': 'Sonia',
+                'responsavel_contatado': '',
+                'horario_chegada': '',
+                'horario_contato': '',
+                'alegado_responsavel': '',
+                'enviar_whatsapp_reincidencia': enviar_reincidencia,
+            },
+            follow=follow,
+        )
+
+    @patch('apps.views.alunos.enviar_template_aviso_ocorrencia_aluno')
+    def test_ocorrencia_atraso_primeira_vez_envia_whatsapp(self, enviar_mock):
+        self.aluno.telefone = '(44) 99999-0000'
+        self.aluno.save(update_fields=['telefone'])
+        enviar_mock.return_value = {
+            'status': True,
+            'numero': '5544999990000',
+            'resposta': {'messages': [{'id': 'wamid.teste'}]},
+            'erro': None,
+            'status_code': 200,
+        }
+
+        response = self._post_ocorrencia_digitador('atraso')
+
+        self.assertTrue(RegistroOcorrenciaAluno.objects.filter(aluno=self.aluno, tipo_ocorrencia='atraso').exists())
+        enviar_mock.assert_called_once()
+        self.assertEqual(enviar_mock.call_args.args[0], '(44) 99999-0000')
+        self.assertEqual(enviar_mock.call_args.args[1], self.aluno.nome)
+        self.assertEqual(enviar_mock.call_args.args[2], 'Atraso')
+        self.assertEqual(enviar_mock.call_args.args[3], '15/05/2026')
+        self.assertContains(response, 'Ocorrencia registrada e aviso enviado pelo WhatsApp.')
+
+    @patch('apps.views.alunos.enviar_template_aviso_ocorrencia_aluno')
+    def test_ocorrencia_atraso_segunda_vez_nao_entra_reincidencia(self, enviar_mock):
+        self.aluno.telefone = '(44) 99999-0000'
+        self.aluno.save(update_fields=['telefone'])
+        RegistroOcorrenciaAluno.objects.create(
+            aluno=self.aluno,
+            data=date(2026, 5, 15),
+            tipo_ocorrencia='atraso',
+            faltou=False,
+            turno='manha',
+            atendido_por='Sonia',
+            registrado_por=self.user,
+        )
+
+        response = self._post_ocorrencia_digitador('atraso', enviar_reincidencia='sim')
+
+        enviar_mock.assert_not_called()
+        self.assertContains(response, 'Ja existe um registro para este aluno nesta data com o mesmo tipo de ocorrencia.')
+        self.assertEqual(RegistroOcorrenciaAluno.objects.filter(aluno=self.aluno, tipo_ocorrencia='atraso').count(), 1)
+
+    @patch('apps.views.alunos.enviar_template_aviso_ocorrencia_aluno')
+    def test_ocorrencia_piercing_continua_com_reincidencia(self, enviar_mock):
+        self.aluno.telefone = '(44) 99999-0000'
+        self.aluno.save(update_fields=['telefone'])
+        RegistroOcorrenciaAluno.objects.create(
+            aluno=self.aluno,
+            data=date(2026, 5, 15),
+            tipo_ocorrencia='piercing',
+            faltou=False,
+            turno='manha',
+            atendido_por='Sonia',
+            registrado_por=self.user,
+        )
+        enviar_mock.return_value = {
+            'status': True,
+            'numero': '5544999990000',
+            'resposta': {'messages': [{'id': 'wamid.teste'}]},
+            'erro': None,
+            'status_code': 200,
+        }
+
+        response = self._post_ocorrencia_digitador('piercing', enviar_reincidencia='sim')
+
+        enviar_mock.assert_called_once()
+        self.assertEqual(enviar_mock.call_args.args[2], 'Uso de Piercing')
+        self.assertContains(response, 'Novo aviso de reincidencia enviado pelo WhatsApp.')
+        self.assertEqual(RegistroOcorrenciaAluno.objects.filter(aluno=self.aluno, tipo_ocorrencia='piercing').count(), 1)
+
 
 class WhatsAppServiceTests(TestCase):
     def test_formatar_numero_whatsapp_adiciona_codigo_do_brasil(self):

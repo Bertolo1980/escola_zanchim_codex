@@ -2,13 +2,16 @@
 
 import logging
 
+from django.db import transaction
+
 from apps.services.whatsapp_service import enviar_template_aviso_ocorrencia_aluno
 
 logger = logging.getLogger(__name__)
 
-TIPOS_OCORRENCIA_WHATSAPP = {'piercing', 'desvio_normas', 'cabelo', 'uniforme', 'fora_sala', 'matando_aula'}
+TIPOS_OCORRENCIA_WHATSAPP = {'atraso', 'piercing', 'desvio_normas', 'cabelo', 'uniforme', 'fora_sala', 'matando_aula'}
 TIPOS_OCORRENCIA_REINCIDENCIA = {'piercing', 'desvio_normas', 'cabelo', 'uniforme'}
 TIPOS_OCORRENCIA_LABELS = {
+    'atraso': 'Atraso',
     'piercing': 'Uso de Piercing',
     'desvio_normas': 'Desvio de Normas',
     'cabelo': 'Cabelo',
@@ -141,18 +144,20 @@ def formulario_digitador(request):
             ocorrencia.aluno = aluno
             ocorrencia.registrado_por = request.user
             try:
-                ocorrencia.save()
+                with transaction.atomic():
+                    ocorrencia.save()
             except IntegrityError:
-                if tipo_ocorrencia in TIPOS_OCORRENCIA_REINCIDENCIA and enviar_reincidencia:
-                    _enviar_aviso_ocorrencia_whatsapp_digitador(
-                        request,
-                        aluno,
-                        tipo_ocorrencia,
-                        ocorrencia.data,
-                        mensagem_sucesso='Novo aviso de reincidencia enviado pelo WhatsApp.',
-                    )
-                else:
-                    messages.warning(request, 'Esta e a segunda ocorrencia deste tipo hoje. Deseja enviar novo aviso pelo WhatsApp?')
+                if tipo_ocorrencia in TIPOS_OCORRENCIA_REINCIDENCIA:
+                    if enviar_reincidencia:
+                        _enviar_aviso_ocorrencia_whatsapp_digitador(
+                            request,
+                            aluno,
+                            tipo_ocorrencia,
+                            ocorrencia.data,
+                            mensagem_sucesso='Novo aviso de reincidencia enviado pelo WhatsApp.',
+                        )
+                    else:
+                        messages.warning(request, 'Esta e a segunda ocorrencia deste tipo hoje. Deseja enviar novo aviso pelo WhatsApp?')
                 messages.error(request, 'Ja existe um registro para este aluno nesta data com o mesmo tipo de ocorrencia. Nao e possivel duplicar sem alterar a restricao atual do banco.')
                 return redirect('formulario_digitador')
 
