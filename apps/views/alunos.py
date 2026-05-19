@@ -1,12 +1,93 @@
 ﻿from .utilitarios import *
 
+import logging
+
+from apps.services.whatsapp_service import enviar_template_aviso_ocorrencia_aluno
+
+logger = logging.getLogger(__name__)
+
+TIPOS_OCORRENCIA_WHATSAPP = {'piercing', 'desvio_normas', 'cabelo', 'uniforme', 'fora_sala', 'matando_aula'}
+TIPOS_OCORRENCIA_REINCIDENCIA = {'piercing', 'desvio_normas', 'cabelo', 'uniforme'}
+TIPOS_OCORRENCIA_LABELS = {
+    'piercing': 'Uso de Piercing',
+    'desvio_normas': 'Desvio de Normas',
+    'cabelo': 'Cabelo',
+    'uniforme': 'Uniforme',
+    'fora_sala': 'Fora da sala',
+    'matando_aula': 'Matando aula',
+}
+
+
+def _telefone_whatsapp_ocorrencia(aluno):
+    for campo in ('telefone_responsavel', 'telefone'):
+        telefone = getattr(aluno, campo, None)
+        if telefone is None:
+            continue
+        telefone = str(telefone).strip()
+        if telefone:
+            return telefone
+    return ''
+
+
+def _data_ocorrencia_whatsapp(data_ocorrencia):
+    try:
+        return datetime.strptime(str(data_ocorrencia), '%Y-%m-%d').strftime('%d/%m/%Y')
+    except ValueError:
+        return str(data_ocorrencia)
+
+
+def _enviar_aviso_ocorrencia_whatsapp_digitador(request, aluno, tipo_ocorrencia, data_ocorrencia, mensagem_sucesso=None):
+    if tipo_ocorrencia == 'falta' or tipo_ocorrencia not in TIPOS_OCORRENCIA_WHATSAPP:
+        return
+
+    telefone = _telefone_whatsapp_ocorrencia(aluno)
+    if not telefone:
+        logger.warning(
+            'Ocorrencia registrada sem envio de WhatsApp: aluno sem telefone cadastrado.',
+            extra={
+                'aluno': aluno.nome,
+                'aluno_id': aluno.id,
+                'tipo_ocorrencia': tipo_ocorrencia,
+                'data_ocorrencia': str(data_ocorrencia),
+            },
+        )
+        messages.warning(request, 'Ocorrencia registrada, mas nao ha telefone cadastrado. Confira o telefone do aluno/responsavel.')
+        return
+
+    resultado_whatsapp = enviar_template_aviso_ocorrencia_aluno(
+        telefone,
+        aluno.nome,
+        TIPOS_OCORRENCIA_LABELS.get(tipo_ocorrencia, tipo_ocorrencia),
+        _data_ocorrencia_whatsapp(data_ocorrencia),
+    )
+
+    if resultado_whatsapp.get('status'):
+        messages.success(request, mensagem_sucesso or 'Ocorrencia registrada e aviso enviado pelo WhatsApp.')
+        return
+
+    logger.warning(
+        'Ocorrencia registrada, mas envio de WhatsApp falhou.',
+        extra={
+            'aluno': aluno.nome,
+            'aluno_id': aluno.id,
+            'numero_usado': resultado_whatsapp.get('numero') or telefone,
+            'tipo_ocorrencia': tipo_ocorrencia,
+            'data_ocorrencia': str(data_ocorrencia),
+            'erro_whatsapp': resultado_whatsapp.get('erro'),
+            'resposta_whatsapp': resultado_whatsapp.get('resposta'),
+            'status_code_whatsapp': resultado_whatsapp.get('status_code'),
+        },
+    )
+    messages.warning(request, 'Ocorrencia registrada, mas o aviso nao foi enviado. Confira o telefone do aluno/responsavel.')
+
+
 @login_required
 @user_passes_test(grupo_digitadores, login_url='/')
 def formulario_digitador(request):
-    """View exclusiva para digitadores (apenas o formulÃ¡rio de ocorrÃªncias)"""
-    tipos_ocorrencia_permitidos = {'atraso', 'piercing', 'cabelo', 'uniforme', 'desvio_normas'}
+    """View exclusiva para digitadores (apenas o formulario de ocorrencias)."""
+    tipos_ocorrencia_permitidos = {'atraso', 'piercing', 'cabelo', 'uniforme', 'desvio_normas', 'fora_sala', 'matando_aula'}
 
-    # Recupera Ãºltima data da sessÃ£o
+    # Recupera ultima data da sessao
     ultima_data_str = request.session.get('ultima_data_ocorrencia')
     if ultima_data_str:
         try:
@@ -16,7 +97,7 @@ def formulario_digitador(request):
     else:
         ultima_data = timezone.now().date()
 
-    # Recupera Ãºltima turma da sessÃ£o
+    # Recupera ultima turma da sessao
     ultima_turma_id = request.session.get('ultima_turma_ocorrencia_id')
     ultima_turma = None
     if ultima_turma_id:
@@ -33,7 +114,7 @@ def formulario_digitador(request):
 
             aluno = Aluno.objects.filter(turma=turma, numero=numero).first()
             if not aluno:
-                messages.error(request, f'Aluno nÃºmero {numero} nÃ£o encontrado na turma {turma.nome}!')
+                messages.error(request, f'Aluno numero {numero} nao encontrado na turma {turma.nome}!')
                 return render(request, 'ocorrencias/formulario_digitador.html', {
                     'form': form,
                     'ultimas_ocorrencias': RegistroOcorrenciaAluno.objects.select_related('aluno', 'aluno__turma').order_by('-data', '-horario_chegada')[:10]
@@ -41,14 +122,15 @@ def formulario_digitador(request):
 
             ocorrencia = form.save(commit=False)
 
-            # ðŸ”§ CORREÃ‡ÃƒO 1: Pega o tipo de ocorrÃªncia do formulÃ¡rio
+            # Pega o tipo de ocorrencia do formulario
             tipo_ocorrencia = request.POST.get('tipo_ocorrencia', 'atraso')
             if tipo_ocorrencia not in tipos_ocorrencia_permitidos:
                 tipo_ocorrencia = 'atraso'
+            enviar_reincidencia = request.POST.get('enviar_whatsapp_reincidencia') == 'sim'
             ocorrencia.tipo_ocorrencia = tipo_ocorrencia
             ocorrencia.faltou = False
 
-            # ðŸ”§ CORREÃ‡ÃƒO 2: Pega o turno do formulÃ¡rio
+            # Pega o turno do formulario
             ocorrencia.turno = form.cleaned_data.get('turno', 'manha')
 
             if ocorrencia.horario_chegada == '':
@@ -58,16 +140,31 @@ def formulario_digitador(request):
 
             ocorrencia.aluno = aluno
             ocorrencia.registrado_por = request.user
-            ocorrencia.save()
+            try:
+                ocorrencia.save()
+            except IntegrityError:
+                if tipo_ocorrencia in TIPOS_OCORRENCIA_REINCIDENCIA and enviar_reincidencia:
+                    _enviar_aviso_ocorrencia_whatsapp_digitador(
+                        request,
+                        aluno,
+                        tipo_ocorrencia,
+                        ocorrencia.data,
+                        mensagem_sucesso='Novo aviso de reincidencia enviado pelo WhatsApp.',
+                    )
+                else:
+                    messages.warning(request, 'Esta e a segunda ocorrencia deste tipo hoje. Deseja enviar novo aviso pelo WhatsApp?')
+                messages.error(request, 'Ja existe um registro para este aluno nesta data com o mesmo tipo de ocorrencia. Nao e possivel duplicar sem alterar a restricao atual do banco.')
+                return redirect('formulario_digitador')
 
             request.session['ultima_data_ocorrencia'] = ocorrencia.data.isoformat()
             request.session['ultima_turma_ocorrencia_id'] = turma.id
             request.session['ultima_turma_ocorrencia_nome'] = turma.nome
 
-            messages.success(request, f'OcorrÃªncia registrada para {aluno.nome} (Turma {turma.nome}, NÂº {numero})')
+            messages.success(request, f'Ocorrencia registrada para {aluno.nome} (Turma {turma.nome}, No {numero})')
+            _enviar_aviso_ocorrencia_whatsapp_digitador(request, aluno, tipo_ocorrencia, ocorrencia.data)
             return redirect('formulario_digitador')
         else:
-            messages.error(request, 'Erro no formulÃ¡rio. Verifique os dados.')
+            messages.error(request, 'Erro no formulario. Verifique os dados.')
     else:
         initial_data = {
             'data': ultima_data.isoformat(),

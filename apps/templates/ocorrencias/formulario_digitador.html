@@ -1,11 +1,11 @@
 {% extends 'base.html' %}
-{% block title %}Registrar Ocorrência{% endblock %}
+{% block title %}Registrar Ocorrencia{% endblock %}
 
 {% block content %}
 <div class="container-fluid px-2 px-md-4 py-3">
     <div class="card">
         <div class="card-header bg-primary text-white">
-            <h4><i class="fas fa-clipboard-list me-2"></i>Registrar Ocorrência de Aluno</h4>
+            <h4><i class="fas fa-clipboard-list me-2"></i>Registrar Ocorrencia de Aluno</h4>
         </div>
         <div class="card-body">
             {% if messages %}
@@ -19,99 +19,88 @@
 
             <form method="post" id="ocorrenciaForm">
                 {% csrf_token %}
+                <input type="hidden" name="enviar_whatsapp_reincidencia" id="enviar_whatsapp_reincidencia" value="">
 
-                <!-- Turma -->
                 <div class="mb-3">
-                    <label class="form-label fw-bold">{{ form.turma.label }}</label>
+                    <label class="form-label fw-bold">Turma</label>
                     {{ form.turma }}
                 </div>
 
-                <!-- Número do Aluno -->
                 <div class="mb-3">
-                    <label class="form-label fw-bold">{{ form.numero_aluno.label }}</label>
+                    <label class="form-label fw-bold">Numero do Aluno</label>
                     {{ form.numero_aluno }}
                 </div>
 
-                <!-- Nome do Aluno (só leitura) -->
                 <div class="mb-3">
-                    <label class="form-label fw-bold">{{ form.nome_aluno.label }}</label>
+                    <label class="form-label fw-bold">Nome do Aluno</label>
                     {{ form.nome_aluno }}
                     <div id="aluno-status" class="mt-2"></div>
                 </div>
 
-                <!-- Data -->
                 <div class="mb-3">
-                    <label class="form-label fw-bold">{{ form.data.label }}</label>
+                    <label class="form-label fw-bold">Data da ocorrencia</label>
                     {{ form.data }}
                 </div>
 
-                <!-- TIPO DE OCORRÊNCIA (NOVO) -->
                 <div class="mb-3">
-                    <label class="form-label fw-bold">Tipo de Ocorrência</label>
+                    <label class="form-label fw-bold">Tipo de Ocorrencia</label>
                     <select name="tipo_ocorrencia" class="form-select" required>
-                        <option value="atraso">⏰ Atraso</option>
-                        <option value="uniforme">👕 Uniforme</option>
-                        <option value="piercing">💍 Piercing</option>
-                        <option value="cabelo">💇 Cabelo</option>
-                        <option value="desvio_normas">⚠️ Desvio de Normas</option>
+                        <option value="atraso">Atraso</option>
+                        <option value="uniforme">Uniforme</option>
+                        <option value="piercing">Piercing</option>
+                        <option value="cabelo">Cabelo</option>
+                        <option value="desvio_normas">Desvio de Normas</option>
+                        <option value="fora_sala">Fora da sala</option>
+                        <option value="matando_aula">Matando aula</option>
                     </select>
                 </div>
 
-                <!-- TURNO (NOVO) -->
                 <div class="mb-3">
                     <label class="form-label fw-bold">Turno</label>
                     <select name="turno" class="form-select" required>
-                        <option value="manha">🌅 Manhã</option>
-                        <option value="tarde">🌇 Tarde</option>
+                        <option value="manha">Manha</option>
+                        <option value="tarde">Tarde</option>
                     </select>
                 </div>
 
-                <!-- Horário de Chegada -->
                 <div class="mb-3">
-                    <label class="form-label fw-bold">Horário de Chegada (opcional)</label>
+                    <label class="form-label fw-bold">Horario de Chegada (opcional)</label>
                     <input type="time" name="horario_chegada" class="form-control" step="60">
                 </div>
 
-                <!-- Atendido por -->
                 <div class="mb-3">
                     <label class="form-label fw-bold">Atendido por</label>
                     <input type="text" name="atendido_por" class="form-control" placeholder="Quem atendeu o aluno?">
                 </div>
 
-                <!-- Motivo Alegado (aluno) -->
                 <div class="mb-3">
                     <label class="form-label fw-bold">Motivo Alegado (aluno)</label>
                     <textarea name="motivo_alegado" class="form-control" rows="2" placeholder="O que o aluno disse?"></textarea>
                 </div>
 
-                <!-- Responsável Contatado -->
                 <div class="mb-3">
-                    <label class="form-label fw-bold">Responsável Contatado</label>
-                    <input type="text" name="responsavel_contatado" class="form-control" placeholder="Nome do responsável">
+                    <label class="form-label fw-bold">Responsavel Contatado</label>
+                    <input type="text" name="responsavel_contatado" class="form-control" placeholder="Nome do responsavel">
                 </div>
 
-                <!-- Horário do Contato -->
                 <div class="mb-3">
-                    <label class="form-label fw-bold">Horário do Contato</label>
+                    <label class="form-label fw-bold">Horario do Contato</label>
                     <input type="time" name="horario_contato" class="form-control" step="60">
                 </div>
 
-                <!-- Alegado pelo Responsável -->
                 <div class="mb-3">
-                    <label class="form-label fw-bold">Alegado pelo Responsável</label>
-                    <textarea name="alegado_responsavel" class="form-control" rows="2" placeholder="O que o responsável disse?"></textarea>
+                    <label class="form-label fw-bold">Alegado pelo Responsavel</label>
+                    <textarea name="alegado_responsavel" class="form-control" rows="2" placeholder="O que o responsavel disse?"></textarea>
                 </div>
 
-                <!-- Observações Adicionais -->
                 <div class="mb-3">
-                    <label class="form-label fw-bold">Observações Adicionais</label>
-                    <textarea name="observacoes_adicionais" class="form-control" rows="2" placeholder="Informações extras"></textarea>
+                    <label class="form-label fw-bold">Observacoes Adicionais</label>
+                    <textarea name="observacoes_adicionais" class="form-control" rows="2" placeholder="Informacoes extras"></textarea>
                 </div>
 
-                <!-- Botões -->
                 <div class="mt-4 d-flex justify-content-between">
                     <button type="submit" class="btn btn-success">
-                        <i class="fas fa-save me-2"></i> Registrar Ocorrência
+                        <i class="fas fa-save me-2"></i> Registrar Ocorrencia
                     </button>
                     <form method="post" action="{% url 'logout' %}" style="display: inline;">
                         {% csrf_token %}
@@ -124,10 +113,9 @@
         </div>
     </div>
 
-    <!-- Últimas Ocorrências -->
     <div class="card mt-4">
         <div class="card-header bg-secondary text-white">
-            <h5><i class="fas fa-history me-2"></i>Últimas Ocorrências Registradas</h5>
+            <h5><i class="fas fa-history me-2"></i>Ultimas Ocorrencias Registradas</h5>
         </div>
         <div class="card-body">
             {% if ultimas_ocorrencias %}
@@ -137,7 +125,7 @@
                             <tr>
                                 <th>Data</th>
                                 <th>Turma</th>
-                                <th>Nº</th>
+                                <th>No</th>
                                 <th>Aluno</th>
                                 <th>Tipo</th>
                             </tr>
@@ -156,7 +144,7 @@
                     </table>
                 </div>
             {% else %}
-                <p class="text-muted text-center mb-0">Nenhuma ocorrência registrada ainda.</p>
+                <p class="text-muted text-center mb-0">Nenhuma ocorrencia registrada ainda.</p>
             {% endif %}
         </div>
     </div>
@@ -169,6 +157,10 @@ document.addEventListener('DOMContentLoaded', function() {
     const nomeInput = document.getElementById('id_nome_aluno');
     const statusDiv = document.getElementById('aluno-status');
     const form = document.getElementById('ocorrenciaForm');
+    const tipoSelect = document.querySelector('select[name="tipo_ocorrencia"]');
+    const dataInput = document.getElementById('id_data');
+    const envioReincidencia = document.getElementById('enviar_whatsapp_reincidencia');
+    const tiposReincidencia = ['piercing', 'desvio_normas', 'cabelo', 'uniforme'];
 
     function buscarAluno() {
         const turmaId = turmaSelect.value;
@@ -180,15 +172,15 @@ document.addEventListener('DOMContentLoaded', function() {
                 .then(data => {
                     if (data.encontrado) {
                         nomeInput.value = data.nome;
-                        statusDiv.innerHTML = '<div class="alert alert-success py-1">✅ Aluno encontrado!</div>';
+                        statusDiv.innerHTML = '<div class="alert alert-success py-1">Aluno encontrado!</div>';
                     } else {
                         nomeInput.value = '';
-                        statusDiv.innerHTML = '<div class="alert alert-danger py-1">❌ ' + data.erro + '</div>';
+                        statusDiv.innerHTML = '<div class="alert alert-danger py-1">' + data.erro + '</div>';
                     }
                 })
                 .catch(error => {
                     nomeInput.value = '';
-                    statusDiv.innerHTML = '<div class="alert alert-danger py-1">⚠️ Erro na busca</div>';
+                    statusDiv.innerHTML = '<div class="alert alert-danger py-1">Erro na busca</div>';
                 });
         } else {
             nomeInput.value = '';
@@ -203,8 +195,34 @@ document.addEventListener('DOMContentLoaded', function() {
     numeroInput.addEventListener('keypress', function(e) {
         if (e.key === 'Enter') {
             e.preventDefault();
-            form.submit();
+            form.requestSubmit();
         }
+    });
+
+    form.addEventListener('submit', function(e) {
+        if (form.dataset.reincidenciaVerificada === 'sim') {
+            return;
+        }
+
+        const tipo = tipoSelect ? tipoSelect.value : '';
+        if (!tiposReincidencia.includes(tipo)) {
+            return;
+        }
+
+        e.preventDefault();
+        fetch(`/ocorrencias/buscar-aluno/?turma_id=${encodeURIComponent(turmaSelect.value)}&numero=${encodeURIComponent(numeroInput.value.trim())}&data=${encodeURIComponent(dataInput.value)}&tipo_ocorrencia=${encodeURIComponent(tipo)}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.reincidencia) {
+                    envioReincidencia.value = window.confirm('Esta e a segunda ocorrencia deste tipo hoje. Deseja enviar novo aviso pelo WhatsApp?') ? 'sim' : 'nao';
+                }
+                form.dataset.reincidenciaVerificada = 'sim';
+                form.submit();
+            })
+            .catch(() => {
+                form.dataset.reincidenciaVerificada = 'sim';
+                form.submit();
+            });
     });
 });
 </script>

@@ -1,9 +1,23 @@
 ﻿import logging
 
 from .utilitarios import *
-from apps.services.whatsapp_service import enviar_template_aviso_falta_aluno
+from apps.services.whatsapp_service import (
+    enviar_template_aviso_falta_aluno,
+    enviar_template_aviso_ocorrencia_aluno,
+)
 
 logger = logging.getLogger(__name__)
+
+TIPOS_OCORRENCIA_WHATSAPP = {'piercing', 'desvio_normas', 'cabelo', 'uniforme', 'fora_sala', 'matando_aula'}
+TIPOS_OCORRENCIA_REINCIDENCIA = {'piercing', 'desvio_normas', 'cabelo', 'uniforme'}
+TIPOS_OCORRENCIA_LABELS = {
+    'piercing': 'Uso de Piercing',
+    'desvio_normas': 'Desvio de Normas',
+    'cabelo': 'Cabelo',
+    'uniforme': 'Uniforme',
+    'fora_sala': 'Fora da sala',
+    'matando_aula': 'Matando aula',
+}
 
 
 def _telefone_whatsapp_aluno(aluno):
@@ -15,6 +29,63 @@ def _telefone_whatsapp_aluno(aluno):
         if telefone:
             return telefone
     return ''
+
+
+def _data_ocorrencia_whatsapp(data_ocorrencia):
+    try:
+        return datetime.strptime(str(data_ocorrencia), '%Y-%m-%d').strftime('%d/%m/%Y')
+    except ValueError:
+        return str(data_ocorrencia)
+
+
+def _tipo_ocorrencia_whatsapp(tipo_ocorrencia):
+    return TIPOS_OCORRENCIA_LABELS.get(tipo_ocorrencia, tipo_ocorrencia)
+
+
+def _enviar_aviso_ocorrencia_whatsapp(request, aluno, tipo_ocorrencia, data_ocorrencia, mensagem_sucesso=None):
+    if tipo_ocorrencia == 'falta' or tipo_ocorrencia not in TIPOS_OCORRENCIA_WHATSAPP:
+        return
+
+    telefone = _telefone_whatsapp_aluno(aluno)
+    if not telefone:
+        logger.warning(
+            'Ocorrencia registrada sem envio de WhatsApp: aluno sem telefone cadastrado.',
+            extra={
+                'aluno': aluno.nome,
+                'aluno_id': aluno.id,
+                'tipo_ocorrencia': tipo_ocorrencia,
+                'data_ocorrencia': str(data_ocorrencia),
+            },
+        )
+        messages.warning(request, 'Ocorrencia registrada, mas nao ha telefone cadastrado. Confira o telefone do aluno/responsavel.')
+        return
+
+    data_formatada = _data_ocorrencia_whatsapp(data_ocorrencia)
+    resultado_whatsapp = enviar_template_aviso_ocorrencia_aluno(
+        telefone,
+        aluno.nome,
+        _tipo_ocorrencia_whatsapp(tipo_ocorrencia),
+        data_formatada,
+    )
+
+    if resultado_whatsapp.get('status'):
+        messages.success(request, mensagem_sucesso or 'Ocorrencia registrada e aviso enviado pelo WhatsApp.')
+        return
+
+    logger.warning(
+        'Ocorrencia registrada, mas envio de WhatsApp falhou.',
+        extra={
+            'aluno': aluno.nome,
+            'aluno_id': aluno.id,
+            'numero_usado': resultado_whatsapp.get('numero') or telefone,
+            'tipo_ocorrencia': tipo_ocorrencia,
+            'data_ocorrencia': str(data_ocorrencia),
+            'erro_whatsapp': resultado_whatsapp.get('erro'),
+            'resposta_whatsapp': resultado_whatsapp.get('resposta'),
+            'status_code_whatsapp': resultado_whatsapp.get('status_code'),
+        },
+    )
+    messages.warning(request, 'Ocorrencia registrada, mas o aviso nao foi enviado. Confira o telefone do aluno/responsavel.')
 
 
 # ===== NOVAS VIEWS PARA CONTROLE DE FALTAS =====
@@ -147,7 +218,7 @@ def editar_ocorrencia_aluno(request, pk):
 
     if request.method == 'POST':
 
-        # Ã°Å¸â€Â§ 1. SALVA OS CAMPOS DA BUSCA ATIVA (VERSÃƒÆ’O ROBUSTA)
+        # Salva os campos da busca ativa.
         responsavel = request.POST.get('responsavel_contatado', '').strip()
         alegado = request.POST.get('alegado_responsavel', '').strip()
         horario_raw = request.POST.get('horario_contato', '').strip()
@@ -165,14 +236,14 @@ def editar_ocorrencia_aluno(request, pk):
                 else:
                     ocorrencia.horario_contato = None
             except Exception as e:
-                print(f"Erro na conversÃƒÂ£o do horÃƒÂ¡rio: {e}")
+                print(f"Erro na conversao do horario: {e}")
                 ocorrencia.horario_contato = None
         else:
             ocorrencia.horario_contato = None
 
         ocorrencia.save()
 
-        # Ã°Å¸â€Â§ MARCA AUTOMATICAMENTE COMO BUSCA ATIVA REALIZADA
+        # Marca automaticamente como busca ativa realizada.
         ocorrencia.busca_ativa_realizada = True
         ocorrencia.save(update_fields=['busca_ativa_realizada'])
 
@@ -181,14 +252,14 @@ def editar_ocorrencia_aluno(request, pk):
         if form.is_valid():
             form.save()
         else:
-            print("Erros do formulÃƒÂ¡rio:", form.errors)   # Ã¢â€ Â ADICIONE ESTA LINHA
+            print("Erros do formulario:", form.errors)
             # Tenta salvar pelo menos os campos importantes que vieram no POST
             if 'atendido_por' in request.POST:
                 ocorrencia.atendido_por = request.POST.get('atendido_por', '')
             if 'motivo_alegado' in request.POST:
                 ocorrencia.motivo_alegado = request.POST.get('motivo_alegado', '')
             ocorrencia.save(update_fields=['atendido_por', 'motivo_alegado'])
-            messages.warning(request, 'Busca Ativa salva, mas outros dados apresentaram erro. Verifique o formulÃƒÂ¡rio.')
+            messages.warning(request, 'Busca Ativa salva, mas outros dados apresentaram erro. Verifique o formulario.')
 
         # Redireciona de volta para a Busca Ativa
         url = '/busca-ativa/'
@@ -200,11 +271,11 @@ def editar_ocorrencia_aluno(request, pk):
         if request.GET.get('turma'):
             params.append(f'turma={request.GET.get("turma")}')
         if params:
-            url += '?' + '&'.join(params)   # Ã¢â€ Â aqui estava o erro (aspas no &)
+            url += '?' + '&'.join(params)
         return redirect(url)
 
     else:
-        # GET: mostra o formulÃƒÂ¡rio
+        # GET: mostra o formulario
         form = RegistroOcorrenciaForm(instance=ocorrencia)
         form.fields['turma'].initial = ocorrencia.aluno.turma
         form.fields['numero_aluno'].initial = ocorrencia.aluno.numero
@@ -225,7 +296,7 @@ def excluir_ocorrencia_aluno(request, pk):
     ocorrencia = get_object_or_404(RegistroOcorrenciaAluno, id=pk)
     if request.method == 'POST':
         ocorrencia.delete()
-        messages.success(request, 'OcorrÃƒÂªncia excluÃƒÂ­da com sucesso!')
+        messages.success(request, 'Ocorrencia excluida com sucesso!')
         return redirect('controle_faltas_alunos')
     return render(request, 'ocorrencias/confirmar_exclusao_ocorrencia.html', {'ocorrencia': ocorrencia})
 
@@ -644,14 +715,14 @@ def editar_falta_aluno(request, falta_id):
 def excluir_falta_aluno(request, falta_id):
     falta = get_object_or_404(RegistroFaltaAluno, id=falta_id)
     falta.delete()
-    messages.success(request, 'Registro excluÃƒÂ­do!')
+    messages.success(request, 'Registro excluido!')
     return redirect('controle_faltas_alunos')
 
 @ocorrencias_required
 def registrar_ocorrencia_aluno(request):
-    tipos_ocorrencia_permitidos = {'atraso', 'piercing', 'cabelo', 'uniforme', 'desvio_normas'}
+    tipos_ocorrencia_permitidos = {'atraso', 'piercing', 'cabelo', 'uniforme', 'desvio_normas', 'fora_sala', 'matando_aula'}
 
-    # Recupera ÃƒÂºltima data da sessÃƒÂ£o
+    # Recupera ultima data da sessao
     ultima_data_str = request.session.get('ultima_data_ocorrencia')
     if ultima_data_str:
         try:
@@ -661,7 +732,7 @@ def registrar_ocorrencia_aluno(request):
     else:
         ultima_data = timezone.now().date()
 
-    # Recupera ÃƒÂºltima turma da sessÃƒÂ£o
+    # Recupera ultima turma da sessao
     ultima_turma_id = request.session.get('ultima_turma_ocorrencia_id')
     ultima_turma = None
     if ultima_turma_id:
@@ -676,7 +747,7 @@ def registrar_ocorrencia_aluno(request):
             pedagoga = request.POST.get('pedagoga_outra', '').strip()
 
         if not pedagoga:
-            messages.error(request, 'Selecione ou informe a pedagoga responsÃ¡vel.')
+            messages.error(request, 'Selecione ou informe a pedagoga responsavel.')
             return redirect('registrar_ocorrencia_aluno')
 
         form = RegistroOcorrenciaForm(request.POST)
@@ -686,7 +757,7 @@ def registrar_ocorrencia_aluno(request):
 
             aluno = Aluno.objects.filter(turma=turma, numero=numero).first()
             if not aluno:
-                messages.error(request, f'Aluno nÃƒÂºmero {numero} nÃƒÂ£o encontrado na turma {turma.nome}!')
+                messages.error(request, f'Aluno numero {numero} nao encontrado na turma {turma.nome}!')
                 contexto = {
                     'form': form,
                     'ultimas_ocorrencias': RegistroOcorrenciaAluno.objects.select_related('aluno', 'aluno__turma').order_by('-data', '-horario_chegada')[:10]
@@ -697,6 +768,7 @@ def registrar_ocorrencia_aluno(request):
             tipo_ocorrencia = request.POST.get('tipo_ocorrencia', 'atraso')
             if tipo_ocorrencia not in tipos_ocorrencia_permitidos:
                 tipo_ocorrencia = 'atraso'
+            enviar_reincidencia = request.POST.get('enviar_whatsapp_reincidencia') == 'sim'
             ocorrencia.tipo_ocorrencia = tipo_ocorrencia
             ocorrencia.observacoes_adicionais = request.POST.get('observacoes_adicionais', '')
             ocorrencia.atendido_por = pedagoga
@@ -713,7 +785,17 @@ def registrar_ocorrencia_aluno(request):
                 ocorrencia.registrado_por = request.user
                 ocorrencia.save()
             except IntegrityError:
-                messages.error(request, 'Ja existe um registro para este aluno nesta data com o mesmo tipo de ocorrencia. Nao e possivel duplicar.')
+                if tipo_ocorrencia in TIPOS_OCORRENCIA_REINCIDENCIA and enviar_reincidencia:
+                    _enviar_aviso_ocorrencia_whatsapp(
+                        request,
+                        aluno,
+                        tipo_ocorrencia,
+                        ocorrencia.data,
+                        mensagem_sucesso='Novo aviso de reincidencia enviado pelo WhatsApp.',
+                    )
+                else:
+                    messages.warning(request, 'Esta e a segunda ocorrencia deste tipo hoje. Deseja enviar novo aviso pelo WhatsApp?')
+                messages.error(request, 'Ja existe um registro para este aluno nesta data com o mesmo tipo de ocorrencia. Nao e possivel duplicar sem alterar a restricao atual do banco.')
                 return redirect('registrar_ocorrencia_aluno')
 
             request.session['ultima_data_ocorrencia'] = ocorrencia.data.isoformat()
@@ -723,23 +805,24 @@ def registrar_ocorrencia_aluno(request):
             request.session['ultimo_turno'] = request.POST.get('turno', 'manha')
 
             messages.success(request, f'Ocorrencia registrada para {aluno.nome} (Turma {turma.nome}, No {numero})')
+            _enviar_aviso_ocorrencia_whatsapp(request, aluno, tipo_ocorrencia, ocorrencia.data)
             return redirect('registrar_ocorrencia_aluno')
         else:
             messages.error(request, 'Erro no formulario. Verifique os dados.')
             return redirect('registrar_ocorrencia_aluno')
 
     else:
-        # ===== RECUPERA O ÃƒÅ¡LTIMO TIPO E TURNO DA SESSÃƒÆ’O =====
+        # Recupera o ultimo tipo e turno da sessao.
         ultimo_tipo = request.session.get('ultimo_tipo_ocorrencia', 'atraso')
         if ultimo_tipo not in tipos_ocorrencia_permitidos:
             ultimo_tipo = 'atraso'
-        ultimo_turno = request.session.get('ultimo_turno', 'manha')  # Ã¢â€ Â NOVO
+        ultimo_turno = request.session.get('ultimo_turno', 'manha')
 
         initial_data = {
             'data': ultima_data.isoformat(),
             'faltou': False,
             'tipo_ocorrencia': ultimo_tipo,
-            'turno': ultimo_turno,  # Ã¢â€ Â NOVO
+            'turno': ultimo_turno,
         }
         form = RegistroOcorrenciaForm(initial=initial_data)
         if ultima_turma:
@@ -756,23 +839,33 @@ def registrar_ocorrencia_aluno(request):
 def buscar_aluno_ajax(request):
     turma_id = request.GET.get('turma_id')
     numero = request.GET.get('numero', '')
+    data = request.GET.get('data', '')
+    tipo_ocorrencia = request.GET.get('tipo_ocorrencia', '')
 
     if turma_id and numero:
         try:
             turma = Turma.objects.get(id=turma_id)
             aluno = Aluno.objects.get(turma=turma, numero=numero)
+            reincidencia = False
+            if data and tipo_ocorrencia in TIPOS_OCORRENCIA_REINCIDENCIA:
+                reincidencia = RegistroOcorrenciaAluno.objects.filter(
+                    aluno=aluno,
+                    data=data,
+                    tipo_ocorrencia=tipo_ocorrencia,
+                ).exists()
             return JsonResponse({
                 'encontrado': True,
                 'nome': aluno.nome,
                 'turma': turma.nome,
-                'numero': aluno.numero
+                'numero': aluno.numero,
+                'reincidencia': reincidencia,
             })
         except (Turma.DoesNotExist, Aluno.DoesNotExist):
             return JsonResponse({
                 'encontrado': False,
-                'erro': 'Aluno nÃƒÂ£o encontrado nesta turma.'
+                'erro': 'Aluno nao encontrado nesta turma.'
             })
-    return JsonResponse({'encontrado': False, 'erro': 'Informe turma e nÃƒÂºmero.'})
+    return JsonResponse({'encontrado': False, 'erro': 'Informe turma e numero.'})
 
 # =============================================================================
 # BUSCA ATIVA - GESTÃƒÆ’O DE FALTAS PENDENTES
@@ -829,7 +922,7 @@ def marcar_busca_ativa(request, pk):
     ocorrencia = get_object_or_404(RegistroOcorrenciaAluno, id=pk)
     ocorrencia.busca_ativa_realizada = True
     ocorrencia.save()
-    messages.success(request, f'Ã¢Å“â€¦ Busca ativa marcada para {ocorrencia.aluno.nome}')
+    messages.success(request, f'Busca ativa marcada para {ocorrencia.aluno.nome}')
 
     # Pegar os parÃƒÂ¢metros da URL para manter os filtros
     mes = request.GET.get('mes', '')
@@ -869,6 +962,6 @@ def marcar_todos_busca_ativa(request):
             ocorrencias = ocorrencias.filter(aluno__turma_id=turma_id)
 
         quantidade = ocorrencias.update(busca_ativa_realizada=True)
-        messages.success(request, f'Ã¢Å“â€¦ {quantidade} ocorrÃƒÂªncia(s) marcada(s) como busca ativa realizada!')
+        messages.success(request, f'{quantidade} ocorrencia(s) marcada(s) como busca ativa realizada!')
 
     return redirect('busca_ativa')

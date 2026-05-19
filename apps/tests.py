@@ -6,8 +6,13 @@ from django.contrib.auth.models import Group, User
 from django.test import TestCase, override_settings
 from django.urls import reverse
 
-from .models import Aluno, RegistroFaltaAluno, RegistroOcorrenciaAluno, Turma
-from .services.whatsapp_service import enviar_mensagem_whatsapp, enviar_template_aviso_falta_aluno, formatar_numero_whatsapp
+from .models import AgendamentoLab, Aluno, Laboratorio, Professor, RegistroFaltaAluno, RegistroOcorrenciaAluno, Turma
+from .services.whatsapp_service import (
+    enviar_mensagem_whatsapp,
+    enviar_template_aviso_falta_aluno,
+    enviar_template_aviso_ocorrencia_aluno,
+    formatar_numero_whatsapp,
+)
 from .views.faltas import _telefone_whatsapp_aluno
 
 
@@ -186,6 +191,77 @@ class FaltasOcorrenciasSeparacaoTests(TestCase):
         self.assertEqual(enviar_mock.call_args.args[2], '15/05/2026')
         self.assertContains(response, 'Falta registrada e aviso enviado pelo WhatsApp.')
 
+    @patch('apps.views.alunos.enviar_template_aviso_ocorrencia_aluno')
+    def test_ocorrencia_com_whatsapp_enviado_exibe_sucesso(self, enviar_mock):
+        self.client.force_login(self.user)
+        self.aluno.telefone = '(44) 99999-0000'
+        self.aluno.save(update_fields=['telefone'])
+        enviar_mock.return_value = {
+            'status': True,
+            'numero': '5544999990000',
+            'resposta': {'messages': [{'id': 'wamid.teste'}]},
+            'erro': None,
+            'status_code': 200,
+        }
+
+        response = self.client.post(
+            reverse('formulario_digitador'),
+            {
+                'turma': self.turma.pk,
+                'numero_aluno': self.aluno.numero,
+                'nome_aluno': self.aluno.nome,
+                'data': '2026-05-15',
+                'turno': 'manha',
+                'faltou': '',
+                'tipo_ocorrencia': 'piercing',
+                'motivo_alegado': 'Uso de piercing',
+                'atendido_por': 'Sonia',
+                'responsavel_contatado': '',
+                'horario_chegada': '',
+                'horario_contato': '',
+                'alegado_responsavel': '',
+            },
+            follow=True,
+        )
+
+        self.assertTrue(RegistroOcorrenciaAluno.objects.filter(aluno=self.aluno, tipo_ocorrencia='piercing').exists())
+        enviar_mock.assert_called_once()
+        self.assertEqual(enviar_mock.call_args.args[0], '(44) 99999-0000')
+        self.assertEqual(enviar_mock.call_args.args[1], self.aluno.nome)
+        self.assertEqual(enviar_mock.call_args.args[2], 'Uso de Piercing')
+        self.assertEqual(enviar_mock.call_args.args[3], '15/05/2026')
+        self.assertContains(response, 'Ocorrencia registrada e aviso enviado pelo WhatsApp.')
+
+    @patch('apps.views.alunos.enviar_template_aviso_ocorrencia_aluno')
+    def test_ocorrencia_sem_telefone_salva_e_alerta_sem_envio(self, enviar_mock):
+        self.client.force_login(self.user)
+
+        with self.assertLogs('apps.views.alunos', level='WARNING') as logs:
+            response = self.client.post(
+                reverse('formulario_digitador'),
+                {
+                    'turma': self.turma.pk,
+                    'numero_aluno': self.aluno.numero,
+                    'nome_aluno': self.aluno.nome,
+                    'data': '2026-05-15',
+                    'turno': 'manha',
+                    'faltou': '',
+                    'tipo_ocorrencia': 'uniforme',
+                    'motivo_alegado': 'Uniforme',
+                    'atendido_por': 'Sonia',
+                    'responsavel_contatado': '',
+                    'horario_chegada': '',
+                    'horario_contato': '',
+                    'alegado_responsavel': '',
+                },
+                follow=True,
+            )
+
+        self.assertTrue(RegistroOcorrenciaAluno.objects.filter(aluno=self.aluno, tipo_ocorrencia='uniforme').exists())
+        enviar_mock.assert_not_called()
+        self.assertContains(response, 'Ocorrencia registrada, mas nao ha telefone cadastrado.')
+        self.assertIn('aluno sem telefone cadastrado', '\n'.join(logs.output))
+
 
 class WhatsAppServiceTests(TestCase):
     def test_formatar_numero_whatsapp_adiciona_codigo_do_brasil(self):
@@ -220,3 +296,122 @@ class WhatsAppServiceTests(TestCase):
         parametros = payload['template']['components'][0]['parameters']
         self.assertEqual(parametros[0]['text'], 'Aluno Teste')
         self.assertEqual(parametros[1]['text'], '15/05/2026')
+
+    @override_settings(
+        WHATSAPP_TOKEN='token-teste',
+        PHONE_NUMBER_ID='123456',
+        WHATSAPP_API_VERSION='v20.0',
+    )
+    @patch('apps.services.whatsapp_service.requests.post')
+    def test_enviar_template_aviso_ocorrencia_aluno_usa_template_aprovado(self, post_mock):
+        post_mock.return_value.ok = True
+        post_mock.return_value.status_code = 200
+        post_mock.return_value.json.return_value = {'messages': [{'id': 'wamid.teste'}]}
+
+        resultado = enviar_template_aviso_ocorrencia_aluno(
+            '44999990000',
+            'Aluno Teste',
+            'Uso de Piercing',
+            '15/05/2026',
+        )
+
+        self.assertTrue(resultado['status'])
+        payload = post_mock.call_args.kwargs['json']
+        self.assertEqual(payload['type'], 'template')
+        self.assertEqual(payload['template']['name'], 'aviso_ocorrencia_aluno')
+        self.assertEqual(payload['template']['language']['code'], 'pt_BR')
+        parametros = payload['template']['components'][0]['parameters']
+        self.assertEqual(parametros[0]['text'], 'Aluno Teste')
+        self.assertEqual(parametros[1]['text'], 'Uso de Piercing')
+        self.assertEqual(parametros[2]['text'], '15/05/2026')
+
+
+class CronogramaLaboratoriosTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(username='diretivo', password='senha-teste')
+        self.client.force_login(self.user)
+        self.turma = Turma.objects.create(nome='2A', ano=2026, serie='2 Ano', ativa=True, turno='manha')
+        self.professor_manha = Professor.objects.create(nome_completo='Ana Maria Silva', ativo=True)
+        self.professor_tarde = Professor.objects.create(nome_completo='Bruno Costa Lima', ativo=True)
+        self.labs = [
+            Laboratorio.objects.create(nome=f'Laboratorio {i}', tipo='fixo', equipamento='Computadores', ativo=True)
+            for i in range(1, 6)
+        ]
+        self.data_segunda = date(2026, 5, 18)
+        AgendamentoLab.objects.create(
+            laboratorio=self.labs[0],
+            data=self.data_segunda,
+            horario='1',
+            turno='manha',
+            professor=self.professor_manha,
+            turma=self.turma,
+            disciplina='Matematica',
+            observacao='Levar projetor',
+            registrado_por=self.user,
+        )
+        AgendamentoLab.objects.create(
+            laboratorio=self.labs[1],
+            data=self.data_segunda,
+            horario='2',
+            turno='tarde',
+            professor=self.professor_tarde,
+            turma=self.turma,
+            disciplina='Historia',
+            registrado_por=self.user,
+        )
+
+    def _get_cronograma(self, **params):
+        base = {'data_inicio': self.data_segunda.isoformat()}
+        base.update(params)
+        return self.client.get(reverse('cronograma_semanal'), base)
+
+    def test_cronograma_filtra_por_laboratorio(self):
+        response = self._get_cronograma(laboratorio=str(self.labs[0].id))
+
+        self.assertEqual(list(response.context['laboratorios']), [self.labs[0]])
+        self.assertContains(response, 'Matematica')
+        self.assertNotContains(response, 'Historia')
+
+    def test_cronograma_filtra_turno_manha(self):
+        response = self._get_cronograma(turno='manha')
+
+        self.assertContains(response, 'Matematica')
+        self.assertNotContains(response, 'Historia')
+        self.assertTrue(all(slot['turno'] == 'manha' for slot in response.context['slots_cronograma']))
+
+    def test_cronograma_filtra_turno_tarde(self):
+        response = self._get_cronograma(turno='tarde')
+
+        self.assertContains(response, 'Historia')
+        self.assertNotContains(response, 'Matematica')
+        self.assertTrue(all(slot['turno'] == 'tarde' for slot in response.context['slots_cronograma']))
+
+    def test_cronograma_filtra_laboratorio_e_turno(self):
+        response = self._get_cronograma(laboratorio=str(self.labs[1].id), turno='tarde')
+
+        self.assertEqual(list(response.context['laboratorios']), [self.labs[1]])
+        self.assertContains(response, 'Historia')
+        self.assertNotContains(response, 'Matematica')
+
+    def test_cronograma_todos_laboratorios(self):
+        response = self._get_cronograma()
+
+        self.assertEqual(len(response.context['laboratorios']), 5)
+        for lab in self.labs:
+            self.assertContains(response, lab.nome)
+
+    def test_cronograma_todos_turnos(self):
+        response = self._get_cronograma()
+
+        turnos = {slot['turno'] for slot in response.context['slots_cronograma']}
+        self.assertEqual(turnos, {'manha', 'tarde'})
+        self.assertContains(response, 'Matematica')
+        self.assertContains(response, 'Historia')
+
+    def test_cronograma_professores_aparecem_no_dia_correto(self):
+        response = self._get_cronograma()
+
+        self.assertContains(response, 'Segunda-feira')
+        self.assertContains(response, self.professor_manha.nome_abreviado)
+        self.assertContains(response, self.professor_tarde.nome_abreviado)
+        self.assertContains(response, 'Levar projetor')
