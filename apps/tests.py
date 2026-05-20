@@ -1,10 +1,12 @@
 ﻿from datetime import date
+from datetime import timedelta
 from types import SimpleNamespace
 from unittest.mock import patch
 
 from django.contrib.auth.models import Group, User
 from django.test import TestCase, override_settings
 from django.urls import reverse
+from django.utils import timezone
 
 from .models import AgendamentoLab, Aluno, Laboratorio, Professor, RegistroFaltaAluno, RegistroOcorrenciaAluno, Turma
 from .services.whatsapp_service import (
@@ -640,3 +642,110 @@ class CronogramaLaboratoriosTests(TestCase):
         self.assertContains(response, self.professor_manha.nome_abreviado)
         self.assertContains(response, self.professor_tarde.nome_abreviado)
         self.assertContains(response, 'Levar projetor')
+
+
+class HomeProfessorLaboratoriosTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(username='professor', password='senha-teste')
+        self.outro_user = User.objects.create_user(username='outro-professor', password='senha-teste')
+        self.professor = Professor.objects.create(
+            usuario=self.user,
+            nome_completo='Carlos Alberto Souza',
+            ativo=True,
+        )
+        self.outro_professor = Professor.objects.create(
+            usuario=self.outro_user,
+            nome_completo='Marina Oliveira',
+            ativo=True,
+        )
+        self.turma = Turma.objects.create(nome='3A', ano=2026, serie='3 Ano', ativa=True, turno='manha')
+        self.laboratorio_1 = Laboratorio.objects.create(nome='Laboratorio 1', tipo='fixo', equipamento='Computadores', ativo=True)
+        self.laboratorio_2 = Laboratorio.objects.create(nome='Laboratorio 2', tipo='fixo', equipamento='Computadores', ativo=True)
+        self.semana_atual_inicio = timezone.localdate() - timedelta(days=timezone.localdate().weekday())
+
+    def _agendar(self, professor, laboratorio, data, horario='1', disciplina='Fisica', observacao=''):
+        return AgendamentoLab.objects.create(
+            laboratorio=laboratorio,
+            data=data,
+            horario=horario,
+            turno='manha',
+            professor=professor,
+            turma=self.turma,
+            disciplina=disciplina,
+            observacao=observacao,
+            registrado_por=self.user,
+        )
+
+    def test_home_mostra_link_discreto_para_meus_horarios(self):
+        self.client.force_login(self.user)
+
+        response = self.client.get(reverse('home'))
+
+        self.assertContains(response, 'Meus Horarios de Laboratorio')
+        self.assertContains(response, reverse('meus_horarios_laboratorio'))
+        self.assertNotContains(response, 'Nenhum horario de laboratorio encontrado.')
+
+    def test_professor_logado_ve_apenas_proprios_agendamentos(self):
+        self._agendar(
+            self.professor,
+            self.laboratorio_1,
+            self.semana_atual_inicio,
+            horario='1',
+            disciplina='Fisica',
+            observacao='Levar roteiro',
+        )
+        self._agendar(
+            self.outro_professor,
+            self.laboratorio_2,
+            self.semana_atual_inicio,
+            horario='2',
+            disciplina='Quimica',
+        )
+        self.client.force_login(self.user)
+
+        response = self.client.get(reverse('meus_horarios_laboratorio'))
+
+        self.assertContains(response, 'Meus Horarios de Laboratorio')
+        self.assertContains(response, 'Laboratorio 1')
+        self.assertContains(response, 'Fisica')
+        self.assertContains(response, 'Levar roteiro')
+        self.assertNotContains(response, 'Laboratorio 2')
+        self.assertNotContains(response, 'Quimica')
+        self.assertEqual(len(response.context['horarios_laboratorio_professor']['agendamentos']), 1)
+
+    def test_meus_horarios_usa_semana_atual_quando_tem_agendamento(self):
+        data_atual = self.semana_atual_inicio + timedelta(days=1)
+        data_antiga = self.semana_atual_inicio - timedelta(days=14)
+        self._agendar(self.professor, self.laboratorio_1, data_atual, disciplina='Biologia')
+        self._agendar(self.professor, self.laboratorio_2, data_antiga, horario='2', disciplina='Geografia')
+        self.client.force_login(self.user)
+
+        response = self.client.get(reverse('meus_horarios_laboratorio'))
+
+        self.assertContains(response, 'Biologia')
+        self.assertNotContains(response, 'Geografia')
+        self.assertEqual(response.context['horarios_laboratorio_professor']['semana_inicio'], self.semana_atual_inicio)
+
+    def test_meus_horarios_sem_semana_atual_pega_semana_mais_recente(self):
+        data_antiga = self.semana_atual_inicio - timedelta(days=14)
+        data_recente = self.semana_atual_inicio - timedelta(days=7)
+        self._agendar(self.professor, self.laboratorio_1, data_antiga, disciplina='Artes')
+        self._agendar(self.professor, self.laboratorio_2, data_recente, horario='2', disciplina='Robotica')
+        self.client.force_login(self.user)
+
+        response = self.client.get(reverse('meus_horarios_laboratorio'))
+
+        self.assertContains(response, 'Robotica')
+        self.assertNotContains(response, 'Artes')
+        self.assertEqual(
+            response.context['horarios_laboratorio_professor']['semana_inicio'],
+            data_recente - timedelta(days=data_recente.weekday()),
+        )
+
+    def test_meus_horarios_sem_agendamento_mostra_mensagem(self):
+        self.client.force_login(self.user)
+
+        response = self.client.get(reverse('meus_horarios_laboratorio'))
+
+        self.assertContains(response, 'Nenhum horario de laboratorio encontrado.')
+        self.assertEqual(response.context['horarios_laboratorio_professor']['agendamentos'], [])

@@ -4,7 +4,7 @@ from .utilitarios import *
 # GESTAO DE LABORATORIOS E EMPRESTIMOS
 # =============================================================================
 
-from ..models import Laboratorio, ItemEquipamento, AgendamentoLab, Emprestimo
+from ..models import Laboratorio, ItemEquipamento, AgendamentoLab, Emprestimo, Professor
 from django.db.models import Max, Q
 from django.urls import reverse
 from datetime import datetime, timedelta
@@ -21,7 +21,9 @@ MAPA_DIAS_LAB = {
     'Tuesday': 'Terca-feira',
     'Wednesday': 'Quarta-feira',
     'Thursday': 'Quinta-feira',
-    'Friday': 'Sexta-feira'
+    'Friday': 'Sexta-feira',
+    'Saturday': 'Sabado',
+    'Sunday': 'Domingo',
 }
 
 
@@ -87,6 +89,60 @@ def _agendamentos_cards(agendamentos):
             'horario_label': f'Aula{agendamento.horario}',
         })
     return cards
+
+
+def _horarios_laboratorio_professor(user):
+    professor = Professor.objects.filter(usuario=user, ativo=True).first()
+    if not professor:
+        return {
+            'professor': None,
+            'agendamentos': [],
+            'semana_inicio': None,
+            'semana_fim': None,
+        }
+
+    hoje = timezone.localdate()
+    semana_inicio = _inicio_semana(hoje)
+    semana_fim = semana_inicio + timedelta(days=6)
+
+    base = AgendamentoLab.objects.filter(professor=professor)
+    agendamentos = base.filter(data__range=(semana_inicio, semana_fim))
+
+    if not agendamentos.exists():
+        data_recente = base.aggregate(data=Max('data'))['data']
+        if data_recente:
+            semana_inicio = _inicio_semana(data_recente)
+            semana_fim = semana_inicio + timedelta(days=6)
+            agendamentos = base.filter(data__range=(semana_inicio, semana_fim))
+
+    agendamentos = agendamentos.select_related('laboratorio', 'turma').order_by(
+        'data', 'turno', 'horario', 'laboratorio__nome'
+    )
+    turno_labels = dict(TURNOS_LAB)
+    itens = []
+    for agendamento in agendamentos:
+        dia_en = agendamento.data.strftime('%A')
+        itens.append({
+            'agendamento': agendamento,
+            'dia': MAPA_DIAS_LAB.get(dia_en, dia_en),
+            'turno': turno_labels.get(agendamento.turno, agendamento.turno),
+            'aula': f'Aula{agendamento.horario}',
+        })
+
+    return {
+        'professor': professor,
+        'agendamentos': itens,
+        'semana_inicio': semana_inicio,
+        'semana_fim': semana_fim,
+    }
+
+
+@login_required
+def meus_horarios_laboratorio(request):
+    context = {
+        'horarios_laboratorio_professor': _horarios_laboratorio_professor(request.user),
+    }
+    return render(request, 'laboratorios/meus_horarios.html', context)
 
 @login_required
 @user_passes_test(pertence_ao_grupo_equipe_diretiva, login_url='/')

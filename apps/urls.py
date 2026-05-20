@@ -64,6 +64,7 @@ urlpatterns = [
     path('listar-alunos/', views.listar_alunos, name='listar_alunos'),
     path('editar-aluno/<int:aluno_id>/', views.editar_aluno, name='editar_aluno'),
     path('laboratorios/', views.listar_laboratorios, name='listar_laboratorios'),
+    path('laboratorios/meus-horarios/', views.meus_horarios_laboratorio, name='meus_horarios_laboratorio'),
     path('laboratorios/agendar/<int:lab_id>/', views.agendamento_lab, name='agendamento_lab'),
     path('laboratorios/cronograma/', views.cronograma_semanal, name='cronograma_semanal'),
     path('laboratorios/excluir-agendamento/<int:agendamento_id>/', views.excluir_agendamento, name='excluir_agendamento'),
