@@ -24,6 +24,25 @@
             margin-bottom: 6px;
         }
 
+        .turno-separator {
+            border-radius: 6px;
+            color: #fff;
+            font-weight: bold;
+            letter-spacing: 1px;
+            margin: 14px 0 10px;
+            padding: 8px;
+            text-align: center;
+        }
+
+        .turno-separator.manha {
+            background: #0d6efd;
+        }
+
+        .turno-separator.tarde {
+            background: #ffc107;
+            color: #111;
+        }
+
         table {
             width: 100%;
             border-collapse: collapse;
@@ -70,39 +89,44 @@
         </p>
     </div>
 
-    {% for lab in laboratorios %}
-        <section class="lab-schedule">
-            <div class="lab-title">{{ lab.nome }} - {{ lab.equipamento }}</div>
-            <table>
-                <thead>
-                    <tr>
-                        <th>Aula</th>
-                        {% for dia in dias_semana %}
-                            <th>{{ dia }}</th>
-                        {% endfor %}
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for slot in slots_cronograma %}
+    {% for grupo in grupos_turno_cronograma %}
+        {% if not turno_filtro %}
+        <div class="turno-separator {{ grupo.turno }}" data-turno-separator="{{ grupo.turno }}">{{ grupo.titulo }}</div>
+        {% endif %}
+        {% for lab in laboratorios %}
+            <section class="lab-schedule">
+                <div class="lab-title">{{ lab.nome }} - {{ lab.equipamento }}</div>
+                <table>
+                    <thead>
                         <tr>
-                            <td><strong>{{ slot.horario_label }}</strong><br><small>{{ slot.turno_label }}</small></td>
+                            <th>Aula</th>
                             {% for dia in dias_semana %}
-                                <td>
-                                    {% for k, a in agendamentos_dict.items %}
-                                        {% if k.0 == lab.id and k.1 == dia and k.2 == slot.turno and k.3 == slot.horario %}
-                                            <strong>{{ a.disciplina }}</strong><br>
-                                            {{ a.turma.nome }}<br>
-                                            <small>{{ a.professor.nome_abreviado|truncatechars:24 }}</small>
-                                            {% if a.observacao %}<br><small>{{ a.observacao }}</small>{% endif %}
-                                        {% endif %}
-                                    {% endfor %}
-                                </td>
+                                <th>{{ dia }}</th>
                             {% endfor %}
                         </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </section>
+                    </thead>
+                    <tbody>
+                        {% for slot in grupo.slots %}
+                            <tr>
+                                <td><strong>{{ slot.horario_label }}</strong><br><small>{{ slot.turno_label }}</small></td>
+                                {% for dia in dias_semana %}
+                                    <td>
+                                        {% for k, a in agendamentos_dict.items %}
+                                            {% if k.0 == lab.id and k.1 == dia and k.2 == slot.turno and k.3 == slot.horario %}
+                                                <strong>{{ a.disciplina }}</strong><br>
+                                                {{ a.turma.nome }}<br>
+                                                <small>{{ a.professor.nome_abreviado|truncatechars:24 }}</small>
+                                                {% if a.observacao %}<br><small>{{ a.observacao }}</small>{% endif %}
+                                            {% endif %}
+                                        {% endfor %}
+                                    </td>
+                                {% endfor %}
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </section>
+        {% endfor %}
     {% endfor %}
 </body>
 </html>

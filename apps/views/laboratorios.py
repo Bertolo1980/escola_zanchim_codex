@@ -85,10 +85,32 @@ def _agendamentos_cards(agendamentos):
         cards.append({
             'agendamento': agendamento,
             'dia': MAPA_DIAS_LAB.get(dia_en, dia_en),
+            'turno_codigo': agendamento.turno,
             'turno_label': turno_labels.get(agendamento.turno, agendamento.turno),
             'horario_label': f'Aula{agendamento.horario}',
         })
     return cards
+
+
+def _grupos_turno_cronograma(turno_filtro, agendamentos_cards):
+    turnos = [turno for turno in TURNOS_LAB if turno[0] == turno_filtro] if turno_filtro in ['manha', 'tarde'] else TURNOS_LAB
+    estilos = {
+        'manha': ('bg-primary', 'text-white'),
+        'tarde': ('bg-warning', 'text-dark'),
+    }
+    grupos = []
+    for turno, turno_label in turnos:
+        bg_class, text_class = estilos[turno]
+        grupos.append({
+            'turno': turno,
+            'turno_label': turno_label,
+            'titulo': turno_label.upper(),
+            'bg_class': bg_class,
+            'text_class': text_class,
+            'slots': _slots_cronograma(turno),
+            'cards': [card for card in agendamentos_cards if card['turno_codigo'] == turno],
+        })
+    return grupos
 
 
 def _horarios_laboratorio_professor(user, turno_filtro=''):
@@ -309,19 +331,19 @@ def cronograma_semanal(request):
         'laboratorio__nome', 'data', 'horario'
     )
     agendamentos_lista = list(agendamentos)
+    agendamentos_cards = _agendamentos_cards(agendamentos_lista)
 
     context = {
         'dias_semana': DIAS_SEMANA_LAB,
         'horarios': HORARIOS_LAB,
         'slots_cronograma': _slots_cronograma(turno_filtro),
         'agendamentos_dict': _agendamentos_por_chave(agendamentos_lista),
-        'agendamentos_cards': _agendamentos_cards(agendamentos_lista),
+        'agendamentos_cards': agendamentos_cards,
+        'grupos_turno_cronograma': _grupos_turno_cronograma(turno_filtro, agendamentos_cards),
         'laboratorios': laboratorios,
         'laboratorios_todos': laboratorios_todos,
         'data_inicio': data_inicio,
         'data_fim': data_fim,
-        'semana_anterior': data_inicio - timedelta(days=7),
-        'semana_proxima': data_inicio + timedelta(days=7),
         'turno_filtro': turno_filtro,
         'laboratorio_filtro': laboratorio_filtro,
     }
@@ -355,6 +377,7 @@ def cronograma_print(request):
         'laboratorio__nome', 'data', 'horario'
     )
     agendamentos_lista = list(agendamentos)
+    agendamentos_cards = _agendamentos_cards(agendamentos_lista)
 
     # 📤 Contexto
     context = {
@@ -362,13 +385,12 @@ def cronograma_print(request):
         'horarios': HORARIOS_LAB,
         'slots_cronograma': _slots_cronograma(turno_filtro),
         'agendamentos_dict': _agendamentos_por_chave(agendamentos_lista),
-        'agendamentos_cards': _agendamentos_cards(agendamentos_lista),
+        'agendamentos_cards': agendamentos_cards,
+        'grupos_turno_cronograma': _grupos_turno_cronograma(turno_filtro, agendamentos_cards),
         'laboratorios': laboratorios,
         'laboratorios_todos': laboratorios_todos,
         'data_inicio': data_inicio,
         'data_fim': data_fim,
-        'semana_anterior': data_inicio - timedelta(days=7),
-        'semana_proxima': data_inicio + timedelta(days=7),
         'turno_filtro': turno_filtro,
         'laboratorio_filtro': laboratorio_filtro,
     }

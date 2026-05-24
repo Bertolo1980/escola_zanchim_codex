@@ -41,18 +41,19 @@
                 </div>
             </div>
 
-            <div class="d-flex flex-column flex-md-row justify-content-between align-items-stretch align-items-md-center gap-2 mb-4">
-                <a href="?data_inicio={{ semana_anterior|date:'Y-m-d' }}{% if turno_filtro %}&turno={{ turno_filtro }}{% endif %}{% if laboratorio_filtro %}&laboratorio={{ laboratorio_filtro }}{% endif %}" class="btn btn-secondary">
-                    <i class="fas fa-chevron-left"></i> Semana Anterior
-                </a>
-                <span class="fw-bold text-center">Semana de {{ data_inicio|date:"d/m/Y" }} a {{ data_fim|date:"d/m/Y" }}</span>
-                <a href="?data_inicio={{ semana_proxima|date:'Y-m-d' }}{% if turno_filtro %}&turno={{ turno_filtro }}{% endif %}{% if laboratorio_filtro %}&laboratorio={{ laboratorio_filtro }}{% endif %}" class="btn btn-secondary">
-                    Proxima Semana <i class="fas fa-chevron-right"></i>
-                </a>
+            <div class="d-flex justify-content-center mb-4">
+                <span class="schedule-week-label shadow-sm">Semana de {{ data_inicio|date:"d/m/Y" }} a {{ data_fim|date:"d/m/Y" }}</span>
             </div>
 
             <div class="lab-mobile-list">
-                {% for item in agendamentos_cards %}
+                {% if agendamentos_cards %}
+                {% for grupo in grupos_turno_cronograma %}
+                    {% if not turno_filtro %}
+                    <div class="schedule-turno-separator {{ grupo.bg_class }} {{ grupo.text_class }} shadow-sm" data-turno-separator="{{ grupo.turno }}">
+                        {{ grupo.titulo }}
+                    </div>
+                    {% endif %}
+                    {% for item in grupo.cards %}
                     {% with a=item.agendamento %}
                     <article class="lab-mobile-card">
                         <div class="lab-mobile-card__header">
@@ -71,65 +72,76 @@
                         </dl>
                     </article>
                     {% endwith %}
-                {% empty %}
-                    <div class="alert alert-info mb-0">Nenhum agendamento encontrado para os filtros selecionados.</div>
+                    {% endfor %}
                 {% endfor %}
+                {% else %}
+                <div class="alert alert-info mb-0">Nenhum agendamento encontrado para os filtros selecionados.</div>
+                {% endif %}
             </div>
 
             <div class="lab-schedules">
-                {% for lab in laboratorios %}
-                    <section class="lab-schedule mb-4">
-                        <div class="lab-schedule__title">
-                            <span>{{ lab.nome }}</span>
-                            <small>{{ lab.equipamento }}</small>
+                {% if laboratorios %}
+                    {% for grupo in grupos_turno_cronograma %}
+                        {% if not turno_filtro %}
+                        <div class="schedule-turno-separator {{ grupo.bg_class }} {{ grupo.text_class }} shadow-sm" data-turno-separator="{{ grupo.turno }}">
+                            {{ grupo.titulo }}
                         </div>
-                        <div class="table-responsive">
-                            <table class="table table-bordered align-middle text-center mb-0">
-                                <thead>
-                                    <tr class="table-dark">
-                                        <th class="schedule-time">Aula</th>
-                                        {% for dia in dias_semana %}
-                                            <th>{{ dia }}</th>
-                                        {% endfor %}
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for slot in slots_cronograma %}
-                                        <tr>
-                                            <td class="fw-bold bg-light">
-                                                {{ slot.horario_label }}<br>
-                                                <small>{{ slot.turno_label }}</small>
-                                            </td>
-                                            {% for dia in dias_semana %}
-                                                <td>
-                                                    {% for k, a in agendamentos_dict.items %}
-                                                        {% if k.0 == lab.id and k.1 == dia and k.2 == slot.turno and k.3 == slot.horario %}
-                                                            <div class="schedule-entry">
-                                                                <strong>{{ a.disciplina }}</strong>
-                                                                <span>{{ a.turma.nome }}</span>
-                                                                <small>{{ a.professor.nome_abreviado|truncatechars:28 }}</small>
-                                                                {% if a.observacao %}
-                                                                    <small class="schedule-note">{{ a.observacao|truncatechars:80 }}</small>
+                        {% endif %}
+                        {% for lab in laboratorios %}
+                            <section class="lab-schedule mb-4">
+                                <div class="lab-schedule__title">
+                                    <span>{{ lab.nome }}</span>
+                                    <small>{{ lab.equipamento }}</small>
+                                </div>
+                                <div class="table-responsive">
+                                    <table class="table table-bordered align-middle text-center mb-0">
+                                        <thead>
+                                            <tr class="table-dark">
+                                                <th class="schedule-time">Aula</th>
+                                                {% for dia in dias_semana %}
+                                                    <th>{{ dia }}</th>
+                                                {% endfor %}
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for slot in grupo.slots %}
+                                                <tr>
+                                                    <td class="fw-bold bg-light">
+                                                        {{ slot.horario_label }}<br>
+                                                        <small>{{ slot.turno_label }}</small>
+                                                    </td>
+                                                    {% for dia in dias_semana %}
+                                                        <td>
+                                                            {% for k, a in agendamentos_dict.items %}
+                                                                {% if k.0 == lab.id and k.1 == dia and k.2 == slot.turno and k.3 == slot.horario %}
+                                                                    <div class="schedule-entry">
+                                                                        <strong>{{ a.disciplina }}</strong>
+                                                                        <span>{{ a.turma.nome }}</span>
+                                                                        <small>{{ a.professor.nome_abreviado|truncatechars:28 }}</small>
+                                                                        {% if a.observacao %}
+                                                                            <small class="schedule-note">{{ a.observacao|truncatechars:80 }}</small>
+                                                                        {% endif %}
+                                                                        <a href="{% url 'excluir_agendamento' a.id %}?data_inicio={{ data_inicio|date:'Y-m-d' }}{% if turno_filtro %}&turno={{ turno_filtro }}{% endif %}{% if laboratorio_filtro %}&laboratorio={{ laboratorio_filtro }}{% endif %}"
+                                                                           class="btn btn-danger btn-sm mt-2"
+                                                                           onclick="return confirm('Excluir este agendamento?')">
+                                                                            <i class="fas fa-trash-alt"></i> Excluir
+                                                                        </a>
+                                                                    </div>
                                                                 {% endif %}
-                                                                <a href="{% url 'excluir_agendamento' a.id %}?data_inicio={{ data_inicio|date:'Y-m-d' }}{% if turno_filtro %}&turno={{ turno_filtro }}{% endif %}{% if laboratorio_filtro %}&laboratorio={{ laboratorio_filtro }}{% endif %}"
-                                                                   class="btn btn-danger btn-sm mt-2"
-                                                                   onclick="return confirm('Excluir este agendamento?')">
-                                                                    <i class="fas fa-trash-alt"></i> Excluir
-                                                                </a>
-                                                            </div>
-                                                        {% endif %}
+                                                            {% endfor %}
+                                                        </td>
                                                     {% endfor %}
-                                                </td>
+                                                </tr>
                                             {% endfor %}
-                                        </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
-                        </div>
-                    </section>
-                {% empty %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </section>
+                        {% endfor %}
+                    {% endfor %}
+                {% else %}
                     <div class="alert alert-info mb-0">Nenhum laboratorio ativo encontrado.</div>
-                {% endfor %}
+                {% endif %}
             </div>
 
             <div class="mt-4">
@@ -158,6 +170,27 @@
 
     .schedule-filters > div {
         min-width: 180px;
+    }
+
+    .schedule-week-label {
+        display: inline-flex;
+        justify-content: center;
+        border: 1px solid #dbeafe;
+        border-radius: 8px;
+        background: #f8fbff;
+        padding: .65rem 1rem;
+        color: #1f2937;
+        font-weight: 700;
+        text-align: center;
+    }
+
+    .schedule-turno-separator {
+        border-radius: 8px;
+        margin: 1rem 0;
+        padding: .7rem 1rem;
+        font-weight: 800;
+        letter-spacing: .08em;
+        text-align: center;
     }
 
     .lab-schedule {

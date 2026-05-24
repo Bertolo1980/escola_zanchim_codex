@@ -604,6 +604,8 @@ class CronogramaLaboratoriosTests(TestCase):
 
         self.assertContains(response, 'Matematica')
         self.assertNotContains(response, 'Historia')
+        self.assertNotContains(response, 'data-turno-separator="manha"')
+        self.assertNotContains(response, 'data-turno-separator="tarde"')
         self.assertTrue(all(slot['turno'] == 'manha' for slot in response.context['slots_cronograma']))
 
     def test_cronograma_filtra_turno_tarde(self):
@@ -611,6 +613,8 @@ class CronogramaLaboratoriosTests(TestCase):
 
         self.assertContains(response, 'Historia')
         self.assertNotContains(response, 'Matematica')
+        self.assertNotContains(response, 'data-turno-separator="manha"')
+        self.assertNotContains(response, 'data-turno-separator="tarde"')
         self.assertTrue(all(slot['turno'] == 'tarde' for slot in response.context['slots_cronograma']))
 
     def test_cronograma_filtra_laboratorio_e_turno(self):
@@ -634,6 +638,33 @@ class CronogramaLaboratoriosTests(TestCase):
         self.assertEqual(turnos, {'manha', 'tarde'})
         self.assertContains(response, 'Matematica')
         self.assertContains(response, 'Historia')
+        self.assertContains(response, 'data-turno-separator="manha"')
+        self.assertContains(response, 'data-turno-separator="tarde"')
+
+    def test_cronograma_nao_mostra_botoes_de_navegacao_semanal(self):
+        response = self._get_cronograma()
+
+        self.assertNotContains(response, 'Semana Anterior')
+        self.assertNotContains(response, 'Proxima Semana')
+
+    def test_cronograma_sem_data_inicio_usa_semana_mais_recente_com_agendamentos(self):
+        data_recente = date(2026, 6, 3)
+        AgendamentoLab.objects.create(
+            laboratorio=self.labs[2],
+            data=data_recente,
+            horario='3',
+            turno='manha',
+            professor=self.professor_manha,
+            turma=self.turma,
+            disciplina='Robotica',
+            registrado_por=self.user,
+        )
+
+        response = self.client.get(reverse('cronograma_semanal'))
+
+        self.assertEqual(response.context['data_inicio'], date(2026, 6, 1))
+        self.assertContains(response, 'Robotica')
+        self.assertNotContains(response, 'Matematica')
 
     def test_cronograma_professores_aparecem_no_dia_correto(self):
         response = self._get_cronograma()
