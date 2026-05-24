@@ -723,6 +723,8 @@ class HomeProfessorLaboratoriosTests(TestCase):
         self.assertContains(response, 'Fisica')
         self.assertContains(response, 'Manha')
         self.assertNotContains(response, 'Robotica')
+        self.assertNotContains(response, 'data-turno-separator="manha"')
+        self.assertNotContains(response, 'data-turno-separator="tarde"')
         self.assertEqual(response.context['horarios_laboratorio_professor']['turno_filtro'], 'manha')
         self.assertEqual(len(response.context['horarios_laboratorio_professor']['agendamentos']), 1)
 
@@ -736,6 +738,8 @@ class HomeProfessorLaboratoriosTests(TestCase):
         self.assertContains(response, 'Robotica')
         self.assertContains(response, 'Tarde')
         self.assertNotContains(response, 'Fisica')
+        self.assertNotContains(response, 'data-turno-separator="manha"')
+        self.assertNotContains(response, 'data-turno-separator="tarde"')
         self.assertEqual(response.context['horarios_laboratorio_professor']['turno_filtro'], 'tarde')
         self.assertEqual(len(response.context['horarios_laboratorio_professor']['agendamentos']), 1)
 
@@ -748,6 +752,12 @@ class HomeProfessorLaboratoriosTests(TestCase):
 
         self.assertContains(response, 'Fisica')
         self.assertContains(response, 'Robotica')
+        self.assertContains(response, 'data-turno-separator="manha"')
+        self.assertContains(response, 'data-turno-separator="tarde"')
+        conteudo = response.content.decode()
+        self.assertLess(conteudo.index('MANHA'), conteudo.index('Fisica'))
+        self.assertLess(conteudo.index('Fisica'), conteudo.index('TARDE'))
+        self.assertLess(conteudo.index('TARDE'), conteudo.index('Robotica'))
         self.assertEqual(response.context['horarios_laboratorio_professor']['turno_filtro'], '')
         self.assertEqual(len(response.context['horarios_laboratorio_professor']['agendamentos']), 2)
 
