@@ -12,7 +12,7 @@ from django.urls import reverse
 from django.utils import timezone
 from openpyxl import load_workbook
 
-from .models import AgendamentoLab, Aluno, Laboratorio, Professor, RegistroFaltaAluno, RegistroOcorrenciaAluno, Turma
+from .models import AgendamentoLab, Aluno, AvisoProfessor, Laboratorio, Professor, RegistroFaltaAluno, RegistroOcorrenciaAluno, Turma
 from .services.whatsapp_service import (
     enviar_mensagem_whatsapp,
     enviar_template_aviso_falta_aluno,
@@ -89,6 +89,25 @@ class SegurancaSenhaTests(TestCase):
         self.assertRedirects(response, reverse('password_reset_done'))
         self.assertEqual(len(mail.outbox), 1)
         self.assertIn('/conta/redefinir/', mail.outbox[0].body)
+
+
+class AvisoProfessorTests(TestCase):
+    def test_post_aviso_professor_cria_registro(self):
+        response = self.client.post(reverse('aviso_professor'), {
+            'professor_nome': 'Maria Professora',
+            'disciplina': 'Matematica',
+            'data': '2026-06-05',
+            'tipo': 'FALTA',
+            'observacao': 'Aviso de falta',
+        })
+
+        self.assertRedirects(response, reverse('aviso_professor'))
+        aviso = AvisoProfessor.objects.get()
+        self.assertEqual(aviso.professor_nome, 'Maria Professora')
+        self.assertEqual(aviso.disciplina, 'Matematica')
+        self.assertEqual(aviso.data, date(2026, 6, 5))
+        self.assertEqual(aviso.tipo, 'FALTA')
+        self.assertEqual(aviso.observacao, 'Aviso de falta')
 
 
 class FaltasOcorrenciasSeparacaoTests(TestCase):
