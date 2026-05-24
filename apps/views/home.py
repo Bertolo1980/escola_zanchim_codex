@@ -1,5 +1,20 @@
 from .utilitarios import *
 
+SENHA_PADRAO_SEGURANCA = 'zanchim2026'
+
+
+def _deve_exibir_aviso_senha_padrao(user):
+    if not user.is_authenticated or user.is_superuser:
+        return False
+
+    usuario_professor = is_professor(user) or Professor.objects.filter(usuario=user, ativo=True).exists()
+    usuario_equipe = is_equipe_diretiva(user)
+    if not (usuario_professor or usuario_equipe):
+        return False
+
+    return user.check_password(SENHA_PADRAO_SEGURANCA)
+
+
 def home(request):
     eventos = Evento.objects.all().order_by('data')[:5]
     recados = Recado.objects.filter(fixado=True)
@@ -12,6 +27,7 @@ def home(request):
         'documentos': documentos,
         'videos': videos,
         'user': request.user,
+        'mostrar_aviso_senha_padrao': _deve_exibir_aviso_senha_padrao(request.user),
     })
 
 import json
@@ -247,6 +263,7 @@ def painel_equipe(request):
     # ===== CONTEXTO =====
     context = {
         'usuario': request.user,
+        'mostrar_aviso_senha_padrao': _deve_exibir_aviso_senha_padrao(request.user),
         'documentos_privados': documentos_privados,
         'recados_internos': recados_internos,
         'eventos_privados': eventos_privados,

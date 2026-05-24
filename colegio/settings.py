@@ -130,13 +130,16 @@ LOGOUT_REDIRECT_URL = '/'
 SESSION_EXPIRE_AT_BROWSER_CLOSE = True
 
 # ========== CONFIGURAÇÕES DE E-MAIL ==========
-EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
-EMAIL_HOST = 'smtp.gmail.com'
-EMAIL_PORT = 587
-EMAIL_USE_TLS = True
-EMAIL_HOST_USER = 'antonio.senhorini@escola.pr.gov.br'  # seu e-mail
-EMAIL_HOST_PASSWORD = 'dbkicjmgqkowvpqh'
-DEFAULT_FROM_EMAIL = 'antonio.senhorini@escola.pr.gov.br'
+EMAIL_BACKEND = env_config(
+    'EMAIL_BACKEND',
+    default='django.core.mail.backends.console.EmailBackend' if DEBUG else 'django.core.mail.backends.smtp.EmailBackend',
+)
+EMAIL_HOST = env_config('EMAIL_HOST', default='')
+EMAIL_PORT = env_config('EMAIL_PORT', default=587, cast=int)
+EMAIL_USE_TLS = env_config('EMAIL_USE_TLS', default=True, cast=bool)
+EMAIL_HOST_USER = env_config('EMAIL_HOST_USER', default='')
+EMAIL_HOST_PASSWORD = env_config('EMAIL_HOST_PASSWORD', default='')
+DEFAULT_FROM_EMAIL = env_config('DEFAULT_FROM_EMAIL', default=EMAIL_HOST_USER or 'no-reply@localhost')
 
 # Configurações para teste via Cloudflare Tunnel
 ALLOWED_HOSTS = [

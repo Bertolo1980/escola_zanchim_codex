@@ -1,3 +1,4 @@
+from django.contrib.auth import views as auth_views
 from django.contrib.auth.views import LogoutView
 from django.urls import path
 
@@ -7,6 +8,47 @@ from apps import views
 urlpatterns = [
     path('accounts/login/', views.CustomLoginView.as_view(), name='login'),
     path('accounts/logout/', LogoutView.as_view(), name='logout'),
+    path(
+        'conta/alterar-senha/',
+        auth_views.PasswordChangeView.as_view(
+            template_name='conta/alterar_senha.html',
+            success_url='/conta/senha-alterada/',
+        ),
+        name='alterar_senha',
+    ),
+    path(
+        'conta/senha-alterada/',
+        auth_views.PasswordChangeDoneView.as_view(template_name='conta/senha_alterada.html'),
+        name='senha_alterada',
+    ),
+    path(
+        'conta/recuperar-senha/',
+        auth_views.PasswordResetView.as_view(
+            template_name='registration/password_reset_form.html',
+            email_template_name='registration/password_reset_email.html',
+            subject_template_name='registration/password_reset_subject.txt',
+            success_url='/conta/recuperar-senha/enviado/',
+        ),
+        name='recuperar_senha',
+    ),
+    path(
+        'conta/recuperar-senha/enviado/',
+        auth_views.PasswordResetDoneView.as_view(template_name='registration/password_reset_done.html'),
+        name='password_reset_done',
+    ),
+    path(
+        'conta/redefinir/<uidb64>/<token>/',
+        auth_views.PasswordResetConfirmView.as_view(
+            template_name='registration/password_reset_confirm.html',
+            success_url='/conta/redefinir/concluido/',
+        ),
+        name='password_reset_confirm',
+    ),
+    path(
+        'conta/redefinir/concluido/',
+        auth_views.PasswordResetCompleteView.as_view(template_name='registration/password_reset_complete.html'),
+        name='password_reset_complete',
+    ),
     path('aviso-professor/', views.aviso_professor, name='aviso_professor'),
     path('avisos-professores/', views.lista_avisos_professores, name='lista_avisos_professores'),
     path('avisos-professores/<int:pk>/visualizar/', views.visualizar_aviso_professor, name='visualizar_aviso_professor'),

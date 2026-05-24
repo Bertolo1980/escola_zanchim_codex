@@ -4,6 +4,7 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 from django.contrib.auth.models import Group, User
+from django.core import mail
 from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
@@ -16,6 +17,74 @@ from .services.whatsapp_service import (
     formatar_numero_whatsapp,
 )
 from .views.faltas import _telefone_whatsapp_aluno
+
+
+class SegurancaSenhaTests(TestCase):
+    def setUp(self):
+        self.grupo_equipe = Group.objects.create(name='Equipe Diretiva')
+        self.grupo_professores = Group.objects.create(name='Professores')
+
+    def test_home_mostra_aviso_para_professor_com_senha_padrao(self):
+        user = User.objects.create_user(username='professor-seguranca', password='zanchim2026')
+        user.groups.add(self.grupo_professores)
+        Professor.objects.create(usuario=user, nome_completo='Professor Seguranca', ativo=True)
+        self.client.force_login(user)
+
+        response = self.client.get(reverse('home'))
+
+        self.assertContains(response, 'Por seguranca, altere sua senha pessoal.')
+        self.assertContains(response, reverse('alterar_senha'))
+        self.assertContains(response, reverse('recuperar_senha'))
+
+    def test_painel_mostra_aviso_para_equipe_com_senha_padrao(self):
+        user = User.objects.create_user(username='equipe-seguranca', password='zanchim2026')
+        user.groups.add(self.grupo_equipe)
+        self.client.force_login(user)
+
+        response = self.client.get(reverse('painel_equipe'))
+
+        self.assertContains(response, 'Por seguranca, altere sua senha pessoal.')
+        self.assertContains(response, reverse('alterar_senha'))
+        self.assertContains(response, reverse('recuperar_senha'))
+
+    def test_aviso_nao_aparece_para_superuser(self):
+        user = User.objects.create_superuser(username='admin-seguranca', password='zanchim2026')
+        self.client.force_login(user)
+
+        response = self.client.get(reverse('home'))
+
+        self.assertNotContains(response, 'Por seguranca, altere sua senha pessoal.')
+
+    def test_alterar_senha_funciona_para_usuario_logado(self):
+        user = User.objects.create_user(username='troca-senha', password='zanchim2026')
+        self.client.force_login(user)
+
+        response = self.client.post(
+            reverse('alterar_senha'),
+            {
+                'old_password': 'zanchim2026',
+                'new_password1': 'SenhaForte2026!',
+                'new_password2': 'SenhaForte2026!',
+            },
+        )
+
+        self.assertRedirects(response, reverse('senha_alterada'))
+        user.refresh_from_db()
+        self.assertTrue(user.check_password('SenhaForte2026!'))
+
+    @override_settings(EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend')
+    def test_recuperacao_de_senha_envia_email_com_link(self):
+        User.objects.create_user(
+            username='recuperar-senha',
+            email='professor@example.com',
+            password='zanchim2026',
+        )
+
+        response = self.client.post(reverse('recuperar_senha'), {'email': 'professor@example.com'})
+
+        self.assertRedirects(response, reverse('password_reset_done'))
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertIn('/conta/redefinir/', mail.outbox[0].body)
 
 
 class FaltasOcorrenciasSeparacaoTests(TestCase):
