@@ -23,14 +23,8 @@ TIPOS_OCORRENCIA_LABELS = {
 
 
 def _telefone_whatsapp_aluno(aluno):
-    for campo in ('telefone_responsavel', 'telefone'):
-        telefone = getattr(aluno, campo, None)
-        if telefone is None:
-            continue
-        telefone = str(telefone).strip()
-        if telefone:
-            return telefone
-    return ''
+    telefone = getattr(aluno, 'telefone', None)
+    return str(telefone).strip() if telefone else ''
 
 
 def _data_ocorrencia_whatsapp(data_ocorrencia):
@@ -458,7 +452,7 @@ def registrar_falta_aluno(request):
                         'data_falta': str(falta.data),
                     },
                 )
-                messages.warning(request, 'Falta registrada, mas nao ha telefone cadastrado para envio.')
+                messages.warning(request, 'Falta registrada, mas nao ha telefone cadastrado para o aluno.')
                 return redirect('registrar_falta_aluno')
 
             try:

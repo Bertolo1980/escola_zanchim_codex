@@ -340,13 +340,18 @@ class FaltasOcorrenciasSeparacaoTests(TestCase):
         self.assertTrue(RegistroFaltaAluno.objects.filter(aluno=self.aluno).exists())
         enviar_mock.assert_not_called()
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, 'Falta registrada, mas nao ha telefone cadastrado para envio.')
+        self.assertContains(response, 'Falta registrada, mas nao ha telefone cadastrado para o aluno.')
         self.assertIn('aluno sem telefone cadastrado', '\n'.join(logs.output))
 
-    def test_telefone_whatsapp_usa_telefone_quando_responsavel_vazio(self):
-        aluno = SimpleNamespace(telefone_responsavel='   ', telefone='5544999501967')
+    def test_telefone_whatsapp_usa_campo_telefone_do_aluno(self):
+        aluno = SimpleNamespace(telefone='5544999501967')
 
         self.assertEqual(_telefone_whatsapp_aluno(aluno), '5544999501967')
+
+    def test_telefone_whatsapp_ignora_telefone_responsavel_no_fluxo_de_falta(self):
+        aluno = SimpleNamespace(telefone_responsavel='5544999501967', telefone='')
+
+        self.assertEqual(_telefone_whatsapp_aluno(aluno), '')
 
     @patch('apps.views.faltas.enviar_template_aviso_falta_aluno')
     def test_falta_com_falha_no_whatsapp_salva_e_registra_log(self, enviar_mock):
