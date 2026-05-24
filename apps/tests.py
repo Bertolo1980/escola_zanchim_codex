@@ -157,33 +157,35 @@ class FaltasOcorrenciasSeparacaoTests(TestCase):
     def test_fluxo_ocorrencia_digitador_rejeita_tipo_falta(self):
         self.client.force_login(self.user)
 
-        response = self.client.post(
-            reverse('formulario_digitador'),
-            {
-                'turma': self.turma.pk,
-                'numero_aluno': self.aluno.numero,
-                'nome_aluno': self.aluno.nome,
-                'data': '2026-05-15',
-                'turno': 'manha',
-                'faltou': '',
-                'tipo_ocorrencia': 'falta',
-                'motivo_alegado': 'Teste de tipo invalido',
-                'atendido_por': 'Sonia',
-                'responsavel_contatado': '',
-                'horario_chegada': '',
-                'horario_contato': '',
-                'alegado_responsavel': '',
-            },
-        )
+        for tipo_ocorrencia in ('falta', 'Falta'):
+            with self.subTest(tipo_ocorrencia=tipo_ocorrencia):
+                response = self.client.post(
+                    reverse('formulario_digitador'),
+                    {
+                        'turma': self.turma.pk,
+                        'numero_aluno': self.aluno.numero,
+                        'nome_aluno': self.aluno.nome,
+                        'data': '2026-05-15',
+                        'turno': 'manha',
+                        'faltou': '',
+                        'tipo_ocorrencia': tipo_ocorrencia,
+                        'motivo_alegado': 'Teste de tipo invalido',
+                        'atendido_por': 'Sonia',
+                        'responsavel_contatado': '',
+                        'horario_chegada': '',
+                        'horario_contato': '',
+                        'alegado_responsavel': '',
+                    },
+                )
 
-        self.assertRedirects(response, reverse('formulario_digitador'))
-        self.assertFalse(RegistroOcorrenciaAluno.objects.filter(aluno=self.aluno).exists())
-        self.assertFalse(
-            RegistroFaltaAluno.objects.filter(
-                aluno=self.aluno,
-                data=date(2026, 5, 15),
-            ).exists()
-        )
+                self.assertRedirects(response, reverse('formulario_digitador'))
+                self.assertFalse(RegistroOcorrenciaAluno.objects.filter(aluno=self.aluno).exists())
+                self.assertFalse(
+                    RegistroFaltaAluno.objects.filter(
+                        aluno=self.aluno,
+                        data=date(2026, 5, 15),
+                    ).exists()
+                )
 
     def test_fluxo_ocorrencia_real_rejeita_tipo_falta_maiusculo(self):
         response = self._post_ocorrencia_registrar('Falta')

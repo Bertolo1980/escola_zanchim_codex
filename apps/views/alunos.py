@@ -4,6 +4,7 @@ import logging
 
 from django.db import transaction
 
+from apps.forms import TIPOS_OCORRENCIA_PERMITIDOS, normalizar_tipo_ocorrencia
 from apps.services.whatsapp_service import enviar_template_aviso_ocorrencia_aluno
 
 logger = logging.getLogger(__name__)
@@ -89,7 +90,7 @@ def _enviar_aviso_ocorrencia_whatsapp_digitador(request, aluno, tipo_ocorrencia,
 @user_passes_test(grupo_digitadores, login_url='/')
 def formulario_digitador(request):
     """View exclusiva para digitadores (apenas o formulario de ocorrencias)."""
-    tipos_ocorrencia_permitidos = {'atraso', 'piercing', 'cabelo', 'uniforme', 'desvio_normas', 'fora_sala', 'matando_aula'}
+    tipos_ocorrencia_permitidos = TIPOS_OCORRENCIA_PERMITIDOS
 
     # Recupera ultima data da sessao
     ultima_data_str = request.session.get('ultima_data_ocorrencia')
@@ -111,6 +112,11 @@ def formulario_digitador(request):
             ultima_turma = None
 
     if request.method == 'POST':
+        tipo_ocorrencia_postado = normalizar_tipo_ocorrencia(request.POST.get('tipo_ocorrencia'))
+        if tipo_ocorrencia_postado not in tipos_ocorrencia_permitidos:
+            messages.error(request, 'Tipo de ocorrencia invalido. Faltas devem ser registradas em Faltas de Alunos.')
+            return redirect('formulario_digitador')
+
         form = RegistroOcorrenciaForm(request.POST)
         if form.is_valid():
             turma = form.cleaned_data['turma']
@@ -127,9 +133,10 @@ def formulario_digitador(request):
             ocorrencia = form.save(commit=False)
 
             # Pega o tipo de ocorrencia do formulario
-            tipo_ocorrencia = (request.POST.get('tipo_ocorrencia') or '').strip().lower()
+            tipo_ocorrencia = tipo_ocorrencia_postado
             if tipo_ocorrencia not in tipos_ocorrencia_permitidos:
-                tipo_ocorrencia = 'atraso'
+                messages.error(request, 'Tipo de ocorrencia invalido. Faltas devem ser registradas em Faltas de Alunos.')
+                return redirect('formulario_digitador')
             enviar_reincidencia = request.POST.get('enviar_whatsapp_reincidencia') == 'sim'
             ocorrencia.tipo_ocorrencia = tipo_ocorrencia
             ocorrencia.faltou = False
