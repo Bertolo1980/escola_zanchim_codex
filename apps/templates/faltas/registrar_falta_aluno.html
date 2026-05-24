@@ -167,6 +167,31 @@ document.addEventListener('DOMContentLoaded', function () {
         return radio ? radio.value : '';
     }
 
+    function selecionarTurnoAutomatico() {
+        const agora = new Date();
+        const minutosAtuais = agora.getHours() * 60 + agora.getMinutes();
+        const inicioManha = 7 * 60 + 20;
+        const fimManha = 12 * 60 + 45;
+        const inicioTarde = 13 * 60 + 20;
+        let turnoAutomatico = '';
+
+        if (minutosAtuais >= inicioManha && minutosAtuais <= fimManha) {
+            turnoAutomatico = 'manha';
+        } else if (minutosAtuais >= inicioTarde) {
+            turnoAutomatico = 'tarde';
+        }
+
+        if (!turnoAutomatico) {
+            return;
+        }
+
+        const radio = document.querySelector(`input[name="turno_opcao"][value="${turnoAutomatico}"]`);
+        if (radio && !radio.checked) {
+            radio.checked = true;
+            preencherTurmas();
+        }
+    }
+
     function mostrarAviso(tipo, mensagem, detalhe) {
         alunoIdInput.value = '';
         salvarButton.disabled = true;
@@ -267,6 +292,7 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     });
     alternarPedagogaOutra();
+    selecionarTurnoAutomatico();
 });
 </script>
 {% endblock %}
