@@ -31,20 +31,7 @@
                             <label for="pedagoga" class="form-label fw-semibold">
                                 <i class="fas fa-user-tie me-1"></i>Pedagoga
                             </label>
-                            <select name="pedagoga" id="pedagoga" class="form-select" required>
-                                <option value="">Selecione a pedagoga</option>
-                                <option value="Sonia">Sonia</option>
-                                <option value="Simone">Simone</option>
-                                <option value="Vanessa">Vanessa</option>
-                                <option value="Outra">Outra</option>
-                            </select>
-                        </div>
-
-                        <div class="col-12 col-md-5 d-none" id="pedagoga-outra-wrapper">
-                            <label for="pedagoga_outra" class="form-label fw-semibold">
-                                <i class="fas fa-user-tie me-1"></i>Nome da pedagoga
-                            </label>
-                            <input type="text" name="pedagoga_outra" id="pedagoga_outra" class="form-control" placeholder="Digite o nome">
+                            <input type="text" name="pedagoga" id="pedagoga" class="form-control" value="Nao definida">
                         </div>
 
                         <div class="col-12 col-md-5">
@@ -159,20 +146,16 @@ document.addEventListener('DOMContentLoaded', function () {
     const status = document.getElementById('aluno-status');
     const descricao = document.getElementById('id_motivo_alegado');
     const observacoes = document.getElementById('observacoes_adicionais');
-    const pedagogaSelect = document.getElementById('pedagoga');
-    const pedagogaOutraWrapper = document.getElementById('pedagoga-outra-wrapper');
-    const pedagogaOutraInput = document.getElementById('pedagoga_outra');
+    const pedagogaInput = document.getElementById('pedagoga');
     const form = document.getElementById('ocorrencia-form');
     const envioReincidencia = document.getElementById('enviar_whatsapp_reincidencia');
     const tiposReincidencia = ['piercing', 'desvio_normas', 'cabelo', 'uniforme'];
+    const pedagogaNaoDefinida = 'Nao definida';
 
-    function alternarPedagogaOutra() {
-        const usarOutra = pedagogaSelect.value === 'Outra';
-        pedagogaOutraWrapper.classList.toggle('d-none', !usarOutra);
-        pedagogaOutraInput.required = usarOutra;
-        if (!usarOutra) {
-            pedagogaOutraInput.value = '';
-        }
+    function definirPedagoga(pedagoga) {
+        const valor = pedagoga || pedagogaNaoDefinida;
+        pedagogaInput.value = valor;
+        pedagogaInput.readOnly = valor !== pedagogaNaoDefinida;
     }
 
     const selectedTipo = document.querySelector('input[name="tipo_ocorrencia"]:checked');
@@ -188,6 +171,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function limparAluno(mensagem) {
         nomeInput.value = '';
+        definirPedagoga(pedagogaNaoDefinida);
         status.textContent = mensagem || '';
         status.className = mensagem ? 'form-text text-danger' : 'form-text';
     }
@@ -206,6 +190,7 @@ document.addEventListener('DOMContentLoaded', function () {
             .then(data => {
                 if (data.encontrado) {
                     nomeInput.value = data.nome;
+                    definirPedagoga(data.pedagoga);
                     status.textContent = 'Aluno encontrado';
                     status.className = 'form-text text-success';
                 } else {
@@ -218,9 +203,7 @@ document.addEventListener('DOMContentLoaded', function () {
     turmaSelect.addEventListener('change', buscarAluno);
     numeroInput.addEventListener('input', buscarAluno);
     descricao.addEventListener('input', atualizarObservacoes);
-    pedagogaSelect.addEventListener('change', alternarPedagogaOutra);
     form.addEventListener('submit', function (event) {
-        alternarPedagogaOutra();
         atualizarObservacoes();
         if (form.dataset.reincidenciaVerificada === 'sim') {
             return;
@@ -248,7 +231,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 form.submit();
             });
     });
-    alternarPedagogaOutra();
+    definirPedagoga(pedagogaNaoDefinida);
 });
 </script>
 {% endblock %}

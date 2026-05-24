@@ -20,6 +20,7 @@ from .services.whatsapp_service import (
     formatar_numero_whatsapp,
 )
 from .views.faltas import _telefone_whatsapp_aluno
+from .forms import PEDAGOGA_NAO_DEFINIDA, normalizar_turma_mapeamento, pedagoga_por_turma
 
 
 class SegurancaSenhaTests(TestCase):
@@ -193,6 +194,84 @@ class FaltasOcorrenciasSeparacaoTests(TestCase):
         self.assertRedirects(response, reverse('registrar_ocorrencia_aluno'))
         self.assertFalse(RegistroOcorrenciaAluno.objects.filter(aluno=self.aluno).exists())
         self.assertFalse(RegistroFaltaAluno.objects.filter(aluno=self.aluno).exists())
+
+    def test_mapeamento_pedagoga_por_turma(self):
+        casos = [
+            ('1A humanas', '', 'SONIA'),
+            ('1º A Humanas', '', 'SONIA'),
+            ('1 A HUM', '', 'SONIA'),
+            ('1B exatas', '', 'SONIA'),
+            ('1A TEC', '', 'SONIA'),
+            ('1C agro', '', 'WANDA'),
+            ('1 C AGRO', '', 'WANDA'),
+            ('', '1º A Humanas', 'SONIA'),
+            ('', '1 C AGRO', 'WANDA'),
+            ('2A', 'Tecnico', 'VERONICA'),
+            ('2B qualquer', '', 'VERONICA'),
+            ('3A', '3 Ano', 'ELAINE'),
+            ('3C qualquer', '', 'ELAINE'),
+            ('9B', '9 Ano', 'WANDA'),
+            ('7F', '7 Ano', 'ZINGARA'),
+            ('5A', '5 Ano', PEDAGOGA_NAO_DEFINIDA),
+        ]
+
+        for nome, serie, esperado in casos:
+            with self.subTest(nome=nome, serie=serie):
+                turma = Turma(nome=nome, serie=serie)
+                self.assertEqual(pedagoga_por_turma(turma), esperado)
+
+    def test_normalizacao_turma_para_mapeamento(self):
+        turma = Turma(nome='1º  A   Humanas', serie='Ensino Médio')
+
+        self.assertEqual(normalizar_turma_mapeamento(turma), '1 a humanas ensino medio')
+
+    @patch('apps.views.faltas.enviar_template_aviso_falta_aluno')
+    def test_registrar_falta_define_pedagoga_pela_turma(self, enviar_mock):
+        self.turma.nome = '7F'
+        self.turma.serie = '7 Ano'
+        self.turma.save(update_fields=['nome', 'serie'])
+
+        response = self._post_registrar_falta(possui_atestado='sim')
+
+        falta = RegistroFaltaAluno.objects.get(aluno=self.aluno)
+        self.assertEqual(falta.pedagoga, 'ZINGARA')
+        self.assertContains(response, 'Falta registrada com atestado. WhatsApp nao enviado.')
+
+    @patch('apps.views.faltas.enviar_template_aviso_ocorrencia_aluno')
+    def test_registrar_ocorrencia_define_pedagoga_pela_turma(self, enviar_mock):
+        self.turma.nome = '9B'
+        self.turma.serie = '9 Ano'
+        self.turma.save(update_fields=['nome', 'serie'])
+        self.aluno.telefone = ''
+        self.aluno.save(update_fields=['telefone'])
+
+        self._post_ocorrencia_registrar('atraso')
+
+        ocorrencia = RegistroOcorrenciaAluno.objects.get(aluno=self.aluno)
+        self.assertEqual(ocorrencia.atendido_por, 'WANDA')
+
+    @patch('apps.views.alunos.enviar_template_aviso_ocorrencia_aluno')
+    def test_digitador_define_pedagoga_pela_turma(self, enviar_mock):
+        self.turma.nome = '8A'
+        self.turma.serie = '8 Ano'
+        self.turma.save(update_fields=['nome', 'serie'])
+
+        self._post_ocorrencia_digitador('uniforme')
+
+        ocorrencia = RegistroOcorrenciaAluno.objects.get(aluno=self.aluno)
+        self.assertEqual(ocorrencia.atendido_por, 'ELAINE')
+
+    @patch('apps.views.faltas.enviar_template_aviso_falta_aluno')
+    def test_turma_sem_mapeamento_permite_pedagoga_manual(self, enviar_mock):
+        self.turma.nome = '5A'
+        self.turma.serie = '5 Ano'
+        self.turma.save(update_fields=['nome', 'serie'])
+
+        response = self._post_registrar_falta(possui_atestado='sim')
+
+        falta = RegistroFaltaAluno.objects.get(aluno=self.aluno)
+        self.assertEqual(falta.pedagoga, 'Sonia')
+        self.assertContains(response, 'Falta registrada com atestado. WhatsApp nao enviado.')
 
     def test_painel_nao_conta_faltas_historicas_como_ocorrencias(self):
         self.client.force_login(self.equipe_user)

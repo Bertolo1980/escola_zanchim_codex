@@ -70,7 +70,7 @@
 
                 <div class="mb-3">
                     <label class="form-label fw-bold">Atendido por</label>
-                    <input type="text" name="atendido_por" class="form-control" placeholder="Quem atendeu o aluno?">
+                    <input type="text" name="atendido_por" id="atendido_por" class="form-control" value="Nao definida">
                 </div>
 
                 <div class="mb-3">
@@ -161,6 +161,14 @@ document.addEventListener('DOMContentLoaded', function() {
     const dataInput = document.getElementById('id_data');
     const envioReincidencia = document.getElementById('enviar_whatsapp_reincidencia');
     const tiposReincidencia = ['piercing', 'desvio_normas', 'cabelo', 'uniforme'];
+    const atendidoPorInput = document.getElementById('atendido_por');
+    const pedagogaNaoDefinida = 'Nao definida';
+
+    function definirPedagoga(pedagoga) {
+        const valor = pedagoga || pedagogaNaoDefinida;
+        atendidoPorInput.value = valor;
+        atendidoPorInput.readOnly = valor !== pedagogaNaoDefinida;
+    }
 
     function buscarAluno() {
         const turmaId = turmaSelect.value;
@@ -172,18 +180,22 @@ document.addEventListener('DOMContentLoaded', function() {
                 .then(data => {
                     if (data.encontrado) {
                         nomeInput.value = data.nome;
+                        definirPedagoga(data.pedagoga);
                         statusDiv.innerHTML = '<div class="alert alert-success py-1">Aluno encontrado!</div>';
                     } else {
                         nomeInput.value = '';
+                        definirPedagoga(pedagogaNaoDefinida);
                         statusDiv.innerHTML = '<div class="alert alert-danger py-1">' + data.erro + '</div>';
                     }
                 })
                 .catch(error => {
                     nomeInput.value = '';
+                    definirPedagoga(pedagogaNaoDefinida);
                     statusDiv.innerHTML = '<div class="alert alert-danger py-1">Erro na busca</div>';
                 });
         } else {
             nomeInput.value = '';
+            definirPedagoga(pedagogaNaoDefinida);
             statusDiv.innerHTML = '';
         }
     }
@@ -224,6 +236,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 form.submit();
             });
     });
+    definirPedagoga(pedagogaNaoDefinida);
 });
 </script>
 {% endblock %}

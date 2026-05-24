@@ -39,20 +39,7 @@
                             <label for="pedagoga" class="form-label fw-semibold">
                                 <i class="fas fa-user-tie me-1"></i>Pedagoga
                             </label>
-                            <select name="pedagoga" id="pedagoga" class="form-control" required>
-                                <option value="">Selecione a pedagoga</option>
-                                <option value="Sonia">Sonia</option>
-                                <option value="Simone">Simone</option>
-                                <option value="Vanessa">Vanessa</option>
-                                <option value="Outra">Outra</option>
-                            </select>
-                        </div>
-
-                        <div class="col-12 col-md-5 d-none" id="pedagoga-outra-wrapper">
-                            <label for="pedagoga_outra" class="form-label fw-semibold">
-                                <i class="fas fa-user-tie me-1"></i>Nome da pedagoga
-                            </label>
-                            <input type="text" name="pedagoga_outra" id="pedagoga_outra" class="form-control" placeholder="Digite o nome">
+                            <input type="text" name="pedagoga" id="pedagoga" class="form-control" value="{{ pedagoga_nao_definida }}">
                         </div>
 
                         <div class="col-12 col-md-7">
@@ -149,17 +136,13 @@ document.addEventListener('DOMContentLoaded', function () {
     const alunoTurma = document.getElementById('aluno-turma');
     const salvarButton = document.getElementById('btn-salvar');
     const form = document.getElementById('form-falta-aluno');
-    const pedagogaSelect = document.getElementById('pedagoga');
-    const pedagogaOutraWrapper = document.getElementById('pedagoga-outra-wrapper');
-    const pedagogaOutraInput = document.getElementById('pedagoga_outra');
+    const pedagogaInput = document.getElementById('pedagoga');
+    const pedagogaNaoDefinida = '{{ pedagoga_nao_definida }}';
 
-    function alternarPedagogaOutra() {
-        const usarOutra = pedagogaSelect.value === 'Outra';
-        pedagogaOutraWrapper.classList.toggle('d-none', !usarOutra);
-        pedagogaOutraInput.required = usarOutra;
-        if (!usarOutra) {
-            pedagogaOutraInput.value = '';
-        }
+    function definirPedagoga(pedagoga) {
+        const valor = pedagoga || pedagogaNaoDefinida;
+        pedagogaInput.value = valor;
+        pedagogaInput.readOnly = valor !== pedagogaNaoDefinida;
     }
 
     function turnoSelecionado() {
@@ -195,6 +178,7 @@ document.addEventListener('DOMContentLoaded', function () {
     function mostrarAviso(tipo, mensagem, detalhe) {
         alunoIdInput.value = '';
         salvarButton.disabled = true;
+        definirPedagoga(pedagogaNaoDefinida);
         alunoNome.textContent = mensagem || '';
         alunoTurma.textContent = detalhe || '';
 
@@ -262,6 +246,7 @@ document.addEventListener('DOMContentLoaded', function () {
         alunoIdInput.value = aluno.id;
         alunoNome.textContent = aluno.nome;
         alunoTurma.textContent = `${aluno.turma_serie} - ${aluno.turma_nome}`;
+        definirPedagoga(aluno.pedagoga);
         alerta.className = 'alert alert-success mb-0';
         alertaIcone.className = 'fas fa-user-graduate mt-1';
         salvarButton.disabled = false;
@@ -281,17 +266,15 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 
     numeroInput.addEventListener('input', localizarAluno);
-    pedagogaSelect.addEventListener('change', alternarPedagogaOutra);
 
     form.addEventListener('submit', function (event) {
-        alternarPedagogaOutra();
         if (!alunoIdInput.value) {
             event.preventDefault();
             mostrarAviso('erro', 'Localize o aluno antes de salvar.', 'Selecione turno, turma e informe o número de chamada.');
             numeroInput.focus();
         }
     });
-    alternarPedagogaOutra();
+    definirPedagoga(pedagogaNaoDefinida);
     selecionarTurnoAutomatico();
 });
 </script>

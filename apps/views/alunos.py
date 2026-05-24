@@ -4,7 +4,14 @@ import logging
 
 from django.db import transaction
 
-from apps.forms import TIPOS_OCORRENCIA_PERMITIDOS, normalizar_tipo_ocorrencia
+from apps.forms import (
+    PEDAGOGA_NAO_DEFINIDA,
+    TIPOS_OCORRENCIA_PERMITIDOS,
+    normalizar_tipo_ocorrencia,
+    normalizar_turma_mapeamento,
+    pedagoga_por_turma,
+    resolver_pedagoga_turma,
+)
 from apps.services.whatsapp_service import enviar_template_aviso_ocorrencia_aluno
 
 logger = logging.getLogger(__name__)
@@ -143,6 +150,12 @@ def formulario_digitador(request):
 
             # Pega o turno do formulario
             ocorrencia.turno = form.cleaned_data.get('turno', 'manha')
+            pedagoga_informada = request.POST.get('atendido_por', '')
+            logger.info('Turma normalizada para mapeamento de pedagoga: %s', normalizar_turma_mapeamento(aluno.turma))
+            ocorrencia.atendido_por = resolver_pedagoga_turma(
+                aluno.turma,
+                pedagoga_informada,
+            )
 
             if ocorrencia.horario_chegada == '':
                 ocorrencia.horario_chegada = None

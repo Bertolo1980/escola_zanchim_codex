@@ -25,7 +25,8 @@ from ..forms import (
     RecadoInternoForm, DocumentoPrivadoForm, EventoPrivadoForm,
     RegistroOcorrenciaForm, TIPOS_OCORRENCIA_CHOICES_PERMITIDOS,
     TIPOS_OCORRENCIA_LEGADOS_FALTA, TIPOS_OCORRENCIA_PERMITIDOS,
-    normalizar_tipo_ocorrencia
+    PEDAGOGA_NAO_DEFINIDA, normalizar_tipo_ocorrencia, normalizar_turma_mapeamento,
+    pedagoga_por_turma, resolver_pedagoga_turma
 )
 
 # ===== NOVO IMPORT DO WHATSAPP =====

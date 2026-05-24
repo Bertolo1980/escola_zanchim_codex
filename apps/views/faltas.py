@@ -413,15 +413,11 @@ def registrar_falta_aluno(request):
         responsavel = request.POST.get('responsavel', '')
         observacoes = request.POST.get('observacoes', '')
         pedagoga = request.POST.get('pedagoga', '').strip()
-        if pedagoga == 'Outra':
-            pedagoga = request.POST.get('pedagoga_outra', '').strip()
-
-        if not pedagoga:
-            messages.error(request, 'Selecione ou informe a pedagoga responsavel.')
-            return redirect('registrar_falta_aluno')
 
         try:
             aluno = Aluno.objects.get(id=aluno_id)
+            logger.info('Turma normalizada para mapeamento de pedagoga: %s', normalizar_turma_mapeamento(aluno.turma))
+            pedagoga = resolver_pedagoga_turma(aluno.turma, pedagoga)
             if RegistroFaltaAluno.objects.filter(aluno=aluno, data=data).exists():
                 messages.warning(request, 'Este aluno ja possui falta registrada nesta data.')
                 return redirect('registrar_falta_aluno')
@@ -506,9 +502,11 @@ def registrar_falta_aluno(request):
                 'turma_nome': aluno.turma.nome,
                 'turma_serie': aluno.turma.serie,
                 'turno': aluno.turma.turno or '',
+                'pedagoga': pedagoga_por_turma(aluno.turma),
             }
             for aluno in alunos
         ],
+        'pedagoga_nao_definida': PEDAGOGA_NAO_DEFINIDA,
     }
     return render(request, 'faltas/registrar_falta_aluno.html', contexto)
 
@@ -744,12 +742,6 @@ def registrar_ocorrencia_aluno(request):
 
     if request.method == 'POST':
         pedagoga = request.POST.get('pedagoga', '').strip()
-        if pedagoga == 'Outra':
-            pedagoga = request.POST.get('pedagoga_outra', '').strip()
-
-        if not pedagoga:
-            messages.error(request, 'Selecione ou informe a pedagoga responsavel.')
-            return redirect('registrar_ocorrencia_aluno')
 
         form = RegistroOcorrenciaForm(request.POST)
         if form.is_valid():
@@ -765,6 +757,8 @@ def registrar_ocorrencia_aluno(request):
                 }
                 return render(request, 'ocorrencias/registrar_ocorrencia.html', contexto)
 
+            logger.info('Turma normalizada para mapeamento de pedagoga: %s', normalizar_turma_mapeamento(aluno.turma))
+            pedagoga = resolver_pedagoga_turma(aluno.turma, pedagoga)
             ocorrencia = form.save(commit=False)
             tipo_ocorrencia = request.POST.get('tipo_ocorrencia', 'atraso')
             tipo_normalizado = normalizar_tipo_ocorrencia(tipo_ocorrencia)
@@ -862,6 +856,8 @@ def buscar_aluno_ajax(request):
                 'nome': aluno.nome,
                 'turma': turma.nome,
                 'numero': aluno.numero,
+                'pedagoga': pedagoga_por_turma(turma),
+                'pedagoga_nao_definida': PEDAGOGA_NAO_DEFINIDA,
                 'reincidencia': reincidencia,
             })
         except (Turma.DoesNotExist, Aluno.DoesNotExist):
