@@ -20,6 +20,21 @@
             </a>
         </div>
 
+        <form method="get" class="d-flex flex-column flex-sm-row align-items-sm-center justify-content-between gap-2 mb-4">
+            <span class="text-muted small fw-semibold">Filtrar por turno</span>
+            <div class="professor-lab-filter d-flex gap-1" role="group" aria-label="Filtro de turno">
+                <button type="submit" name="turno" value="" class="btn btn-sm {% if not horarios_laboratorio_professor.turno_filtro %}btn-primary{% else %}btn-outline-primary{% endif %}">
+                    Todos
+                </button>
+                <button type="submit" name="turno" value="manha" class="btn btn-sm {% if horarios_laboratorio_professor.turno_filtro == 'manha' %}btn-primary{% else %}btn-outline-primary{% endif %}">
+                    Manha
+                </button>
+                <button type="submit" name="turno" value="tarde" class="btn btn-sm {% if horarios_laboratorio_professor.turno_filtro == 'tarde' %}btn-primary{% else %}btn-outline-primary{% endif %}">
+                    Tarde
+                </button>
+            </div>
+        </form>
+
         {% if horarios_laboratorio_professor.agendamentos %}
         <div class="row g-3">
             {% for item in horarios_laboratorio_professor.agendamentos %}
@@ -35,7 +50,10 @@
                                     <i class="far fa-calendar me-1"></i>{{ item.dia }} - {{ item.agendamento.data|date:"d/m/Y" }}
                                 </div>
                             </div>
-                            <span class="badge rounded-pill text-bg-primary">{{ item.aula }}</span>
+                            <div class="d-flex flex-column align-items-end gap-2">
+                                <span class="badge rounded-pill text-bg-primary">{{ item.aula }}</span>
+                                <span class="professor-lab-turno {{ item.turno_codigo }}">{{ item.turno }}</span>
+                            </div>
                         </div>
 
                         <dl>
@@ -61,7 +79,13 @@
                 <div class="professor-lab-icon rounded-circle mb-3 mx-auto">
                     <i class="far fa-calendar-xmark"></i>
                 </div>
-                <p class="text-muted mb-0">Nenhum horario de laboratorio encontrado.</p>
+                <p class="text-muted mb-0">
+                    {% if horarios_laboratorio_professor.turno_filtro %}
+                    Nenhum horario encontrado para este turno.
+                    {% else %}
+                    Nenhum horario de laboratorio encontrado.
+                    {% endif %}
+                </p>
             </div>
         </div>
         {% endif %}

@@ -663,12 +663,12 @@ class HomeProfessorLaboratoriosTests(TestCase):
         self.laboratorio_2 = Laboratorio.objects.create(nome='Laboratorio 2', tipo='fixo', equipamento='Computadores', ativo=True)
         self.semana_atual_inicio = timezone.localdate() - timedelta(days=timezone.localdate().weekday())
 
-    def _agendar(self, professor, laboratorio, data, horario='1', disciplina='Fisica', observacao=''):
+    def _agendar(self, professor, laboratorio, data, horario='1', disciplina='Fisica', observacao='', turno='manha'):
         return AgendamentoLab.objects.create(
             laboratorio=laboratorio,
             data=data,
             horario=horario,
-            turno='manha',
+            turno=turno,
             professor=professor,
             turma=self.turma,
             disciplina=disciplina,
@@ -712,6 +712,54 @@ class HomeProfessorLaboratoriosTests(TestCase):
         self.assertNotContains(response, 'Laboratorio 2')
         self.assertNotContains(response, 'Quimica')
         self.assertEqual(len(response.context['horarios_laboratorio_professor']['agendamentos']), 1)
+
+    def test_meus_horarios_filtro_manha_funciona(self):
+        self._agendar(self.professor, self.laboratorio_1, self.semana_atual_inicio, disciplina='Fisica', turno='manha')
+        self._agendar(self.professor, self.laboratorio_2, self.semana_atual_inicio, horario='2', disciplina='Robotica', turno='tarde')
+        self.client.force_login(self.user)
+
+        response = self.client.get(reverse('meus_horarios_laboratorio'), {'turno': 'manha'})
+
+        self.assertContains(response, 'Fisica')
+        self.assertContains(response, 'Manha')
+        self.assertNotContains(response, 'Robotica')
+        self.assertEqual(response.context['horarios_laboratorio_professor']['turno_filtro'], 'manha')
+        self.assertEqual(len(response.context['horarios_laboratorio_professor']['agendamentos']), 1)
+
+    def test_meus_horarios_filtro_tarde_funciona(self):
+        self._agendar(self.professor, self.laboratorio_1, self.semana_atual_inicio, disciplina='Fisica', turno='manha')
+        self._agendar(self.professor, self.laboratorio_2, self.semana_atual_inicio, horario='2', disciplina='Robotica', turno='tarde')
+        self.client.force_login(self.user)
+
+        response = self.client.get(reverse('meus_horarios_laboratorio'), {'turno': 'tarde'})
+
+        self.assertContains(response, 'Robotica')
+        self.assertContains(response, 'Tarde')
+        self.assertNotContains(response, 'Fisica')
+        self.assertEqual(response.context['horarios_laboratorio_professor']['turno_filtro'], 'tarde')
+        self.assertEqual(len(response.context['horarios_laboratorio_professor']['agendamentos']), 1)
+
+    def test_meus_horarios_filtro_todos_funciona(self):
+        self._agendar(self.professor, self.laboratorio_1, self.semana_atual_inicio, disciplina='Fisica', turno='manha')
+        self._agendar(self.professor, self.laboratorio_2, self.semana_atual_inicio, horario='2', disciplina='Robotica', turno='tarde')
+        self.client.force_login(self.user)
+
+        response = self.client.get(reverse('meus_horarios_laboratorio'))
+
+        self.assertContains(response, 'Fisica')
+        self.assertContains(response, 'Robotica')
+        self.assertEqual(response.context['horarios_laboratorio_professor']['turno_filtro'], '')
+        self.assertEqual(len(response.context['horarios_laboratorio_professor']['agendamentos']), 2)
+
+    def test_meus_horarios_filtro_sem_resultado_mostra_mensagem_do_turno(self):
+        self._agendar(self.professor, self.laboratorio_1, self.semana_atual_inicio, disciplina='Fisica', turno='manha')
+        self.client.force_login(self.user)
+
+        response = self.client.get(reverse('meus_horarios_laboratorio'), {'turno': 'tarde'})
+
+        self.assertContains(response, 'Nenhum horario encontrado para este turno.')
+        self.assertNotContains(response, 'Fisica')
+        self.assertEqual(response.context['horarios_laboratorio_professor']['agendamentos'], [])
 
     def test_meus_horarios_usa_semana_atual_quando_tem_agendamento(self):
         data_atual = self.semana_atual_inicio + timedelta(days=1)

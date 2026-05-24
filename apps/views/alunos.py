@@ -40,6 +40,7 @@ def _data_ocorrencia_whatsapp(data_ocorrencia):
 
 
 def _enviar_aviso_ocorrencia_whatsapp_digitador(request, aluno, tipo_ocorrencia, data_ocorrencia, mensagem_sucesso=None):
+    tipo_ocorrencia = (tipo_ocorrencia or '').strip().lower()
     if tipo_ocorrencia == 'falta' or tipo_ocorrencia not in TIPOS_OCORRENCIA_WHATSAPP:
         return
 
@@ -126,7 +127,7 @@ def formulario_digitador(request):
             ocorrencia = form.save(commit=False)
 
             # Pega o tipo de ocorrencia do formulario
-            tipo_ocorrencia = request.POST.get('tipo_ocorrencia', 'atraso')
+            tipo_ocorrencia = (request.POST.get('tipo_ocorrencia') or '').strip().lower()
             if tipo_ocorrencia not in tipos_ocorrencia_permitidos:
                 tipo_ocorrencia = 'atraso'
             enviar_reincidencia = request.POST.get('enviar_whatsapp_reincidencia') == 'sim'
@@ -143,6 +144,11 @@ def formulario_digitador(request):
 
             ocorrencia.aluno = aluno
             ocorrencia.registrado_por = request.user
+            ja_existe_mesmo_tipo_antes = RegistroOcorrenciaAluno.objects.filter(
+                aluno=aluno,
+                data=ocorrencia.data,
+                tipo_ocorrencia=tipo_ocorrencia,
+            ).exists()
             try:
                 with transaction.atomic():
                     ocorrencia.save()
@@ -166,7 +172,8 @@ def formulario_digitador(request):
             request.session['ultima_turma_ocorrencia_nome'] = turma.nome
 
             messages.success(request, f'Ocorrencia registrada para {aluno.nome} (Turma {turma.nome}, No {numero})')
-            _enviar_aviso_ocorrencia_whatsapp_digitador(request, aluno, tipo_ocorrencia, ocorrencia.data)
+            if not ja_existe_mesmo_tipo_antes:
+                _enviar_aviso_ocorrencia_whatsapp_digitador(request, aluno, tipo_ocorrencia, ocorrencia.data)
             return redirect('formulario_digitador')
         else:
             messages.error(request, 'Erro no formulario. Verifique os dados.')

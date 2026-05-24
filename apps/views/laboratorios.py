@@ -91,7 +91,10 @@ def _agendamentos_cards(agendamentos):
     return cards
 
 
-def _horarios_laboratorio_professor(user):
+def _horarios_laboratorio_professor(user, turno_filtro=''):
+    if turno_filtro not in ['manha', 'tarde']:
+        turno_filtro = ''
+
     professor = Professor.objects.filter(usuario=user, ativo=True).first()
     if not professor:
         return {
@@ -99,6 +102,7 @@ def _horarios_laboratorio_professor(user):
             'agendamentos': [],
             'semana_inicio': None,
             'semana_fim': None,
+            'turno_filtro': turno_filtro,
         }
 
     hoje = timezone.localdate()
@@ -115,6 +119,9 @@ def _horarios_laboratorio_professor(user):
             semana_fim = semana_inicio + timedelta(days=6)
             agendamentos = base.filter(data__range=(semana_inicio, semana_fim))
 
+    if turno_filtro:
+        agendamentos = agendamentos.filter(turno=turno_filtro)
+
     agendamentos = agendamentos.select_related('laboratorio', 'turma').order_by(
         'data', 'turno', 'horario', 'laboratorio__nome'
     )
@@ -125,6 +132,7 @@ def _horarios_laboratorio_professor(user):
         itens.append({
             'agendamento': agendamento,
             'dia': MAPA_DIAS_LAB.get(dia_en, dia_en),
+            'turno_codigo': agendamento.turno,
             'turno': turno_labels.get(agendamento.turno, agendamento.turno),
             'aula': f'Aula{agendamento.horario}',
         })
@@ -134,13 +142,17 @@ def _horarios_laboratorio_professor(user):
         'agendamentos': itens,
         'semana_inicio': semana_inicio,
         'semana_fim': semana_fim,
+        'turno_filtro': turno_filtro,
     }
 
 
 @login_required
 def meus_horarios_laboratorio(request):
     context = {
-        'horarios_laboratorio_professor': _horarios_laboratorio_professor(request.user),
+        'horarios_laboratorio_professor': _horarios_laboratorio_professor(
+            request.user,
+            request.GET.get('turno', ''),
+        ),
     }
     return render(request, 'laboratorios/meus_horarios.html', context)
 
