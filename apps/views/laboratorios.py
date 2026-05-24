@@ -56,12 +56,18 @@ def _inicio_semana(data):
     return data - timedelta(days=data.weekday())
 
 
-def _data_inicio_cronograma(request):
+def _data_inicio_cronograma(request, laboratorio_id='', turno_filtro=''):
     data_inicio = request.GET.get('data_inicio')
     if data_inicio:
         return _inicio_semana(datetime.strptime(data_inicio, '%Y-%m-%d').date())
 
-    data_recente = AgendamentoLab.objects.aggregate(data=Max('data'))['data']
+    agendamentos = AgendamentoLab.objects.all()
+    if laboratorio_id:
+        agendamentos = agendamentos.filter(laboratorio_id=laboratorio_id)
+    if turno_filtro in ['manha', 'tarde']:
+        agendamentos = agendamentos.filter(turno=turno_filtro)
+
+    data_recente = agendamentos.aggregate(data=Max('data'))['data']
     if data_recente:
         return _inicio_semana(data_recente)
 
@@ -308,12 +314,12 @@ def agendamento_lab(request, lab_id):
 @login_required(login_url='/')
 def cronograma_semanal(request):
     """Exibe o cronograma semanal dos laboratorios, com filtro opcional por turno."""
-    data_inicio = _data_inicio_cronograma(request)
-    data_fim = data_inicio + timedelta(days=6)
-
     # Capturar o filtro de turno (vindo do template)
     turno_filtro = request.GET.get('turno', '')
     laboratorio_filtro = request.GET.get('laboratorio', '')
+    data_inicio = _data_inicio_cronograma(request, laboratorio_filtro, turno_filtro)
+    data_fim = data_inicio + timedelta(days=6)
+
     laboratorios_todos = _laboratorios_agendaveis()
     laboratorios = _laboratorios_filtrados(laboratorio_filtro)
 
@@ -353,12 +359,12 @@ def cronograma_semanal(request):
 @user_passes_test(pertence_ao_grupo_equipe_diretiva, login_url='/')
 def cronograma_print(request):
     """Exibe o cronograma semanal para impressao."""
-    data_inicio = _data_inicio_cronograma(request)
-    data_fim = data_inicio + timedelta(days=6)
-
     # 🔥 CAPTURAR TURNO (FALTAVA ISSO)
     turno_filtro = request.GET.get('turno', '')
     laboratorio_filtro = request.GET.get('laboratorio', '')
+    data_inicio = _data_inicio_cronograma(request, laboratorio_filtro, turno_filtro)
+    data_fim = data_inicio + timedelta(days=6)
+
     laboratorios_todos = _laboratorios_agendaveis()
     laboratorios = _laboratorios_filtrados(laboratorio_filtro)
 
@@ -409,12 +415,11 @@ def exportar_cronograma_excel(request):
     from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
     from openpyxl.utils import get_column_letter
 
-    data_inicio = _data_inicio_cronograma(request)
-    data_fim = data_inicio + timedelta(days=6)
-
     # Captura o filtro de turno (vem do template)
     turno_filtro = request.GET.get('turno', '')
     laboratorio_filtro = request.GET.get('laboratorio', '')
+    data_inicio = _data_inicio_cronograma(request, laboratorio_filtro, turno_filtro)
+    data_fim = data_inicio + timedelta(days=6)
 
     laboratorios = _laboratorios_filtrados(laboratorio_filtro)
     dias_semana = DIAS_SEMANA_LAB

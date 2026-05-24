@@ -1002,7 +1002,7 @@ class CronogramaLaboratoriosTests(TestCase):
         self.assertNotContains(response, 'Proxima Semana')
 
     def test_cronograma_sem_data_inicio_usa_semana_mais_recente_com_agendamentos(self):
-        data_recente = date(2026, 6, 3)
+        data_recente = date(2026, 6, 5)
         AgendamentoLab.objects.create(
             laboratorio=self.labs[2],
             data=data_recente,
@@ -1019,6 +1019,70 @@ class CronogramaLaboratoriosTests(TestCase):
         self.assertEqual(response.context['data_inicio'], date(2026, 6, 1))
         self.assertContains(response, 'Robotica')
         self.assertNotContains(response, 'Matematica')
+
+    def test_cronograma_sem_agendamentos_usa_semana_atual(self):
+        AgendamentoLab.objects.all().delete()
+        hoje = date.today()
+
+        response = self.client.get(reverse('cronograma_semanal'))
+
+        self.assertEqual(response.context['data_inicio'], hoje - timedelta(days=hoje.weekday()))
+
+    def test_cronograma_sem_data_inicio_respeita_filtro_laboratorio(self):
+        AgendamentoLab.objects.create(
+            laboratorio=self.labs[0],
+            data=date(2026, 5, 20),
+            horario='3',
+            turno='manha',
+            professor=self.professor_manha,
+            turma=self.turma,
+            disciplina='Quimica',
+            registrado_por=self.user,
+        )
+        AgendamentoLab.objects.create(
+            laboratorio=self.labs[1],
+            data=date(2026, 6, 5),
+            horario='4',
+            turno='tarde',
+            professor=self.professor_tarde,
+            turma=self.turma,
+            disciplina='Robotica',
+            registrado_por=self.user,
+        )
+
+        response = self.client.get(reverse('cronograma_semanal'), {'laboratorio': str(self.labs[0].id)})
+
+        self.assertEqual(response.context['data_inicio'], date(2026, 5, 18))
+        self.assertContains(response, 'Quimica')
+        self.assertNotContains(response, 'Robotica')
+
+    def test_cronograma_sem_data_inicio_respeita_filtro_turno(self):
+        AgendamentoLab.objects.create(
+            laboratorio=self.labs[2],
+            data=date(2026, 5, 20),
+            horario='3',
+            turno='manha',
+            professor=self.professor_manha,
+            turma=self.turma,
+            disciplina='Quimica',
+            registrado_por=self.user,
+        )
+        AgendamentoLab.objects.create(
+            laboratorio=self.labs[3],
+            data=date(2026, 6, 5),
+            horario='4',
+            turno='tarde',
+            professor=self.professor_tarde,
+            turma=self.turma,
+            disciplina='Robotica',
+            registrado_por=self.user,
+        )
+
+        response = self.client.get(reverse('cronograma_semanal'), {'turno': 'manha'})
+
+        self.assertEqual(response.context['data_inicio'], date(2026, 5, 18))
+        self.assertContains(response, 'Quimica')
+        self.assertNotContains(response, 'Robotica')
 
     def test_cronograma_professores_aparecem_no_dia_correto(self):
         response = self._get_cronograma()
