@@ -2,6 +2,34 @@ from django import forms
 from django.utils import timezone
 from .models import AvisoProfessor, RecadoInterno, DocumentoPrivado, EventoPrivado, RegistroOcorrenciaAluno, Aluno, Turma
 
+TIPOS_OCORRENCIA_PERMITIDOS = {
+    'atraso',
+    'piercing',
+    'cabelo',
+    'uniforme',
+    'desvio_normas',
+    'fora_sala',
+    'matando_aula',
+}
+TIPOS_OCORRENCIA_LEGADOS_FALTA = ('falta', 'Falta')
+TIPOS_OCORRENCIA_CHOICES_PERMITIDOS = [
+    ('atraso', 'Atraso'),
+    ('piercing', 'Uso de Piercing'),
+    ('cabelo', 'Cabelo'),
+    ('uniforme', 'Uniforme'),
+    ('desvio_normas', 'Desvio de Normas'),
+    ('fora_sala', 'Fora da sala'),
+    ('matando_aula', 'Matando aula'),
+]
+
+
+def normalizar_tipo_ocorrencia(tipo_ocorrencia):
+    return (tipo_ocorrencia or '').strip().lower()
+
+
+def tipo_ocorrencia_permitido(tipo_ocorrencia):
+    return normalizar_tipo_ocorrencia(tipo_ocorrencia) in TIPOS_OCORRENCIA_PERMITIDOS
+
 # ===== FORMULÁRIOS EXISTENTES =====
 
 class AvisoProfessorForm(forms.ModelForm):

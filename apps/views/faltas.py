@@ -580,7 +580,9 @@ def _contexto_conferencia_ocorrencias(request):
         data_consulta = timezone.now().date()
         data_filtro = data_consulta.isoformat()
 
-    ocorrencias = RegistroOcorrenciaAluno.objects.filter(data=data_consulta).select_related('aluno', 'aluno__turma')
+    ocorrencias = RegistroOcorrenciaAluno.objects.filter(data=data_consulta).exclude(
+        tipo_ocorrencia__in=TIPOS_OCORRENCIA_LEGADOS_FALTA
+    ).select_related('aluno', 'aluno__turma')
 
     if turno_filtro:
         ocorrencias = ocorrencias.filter(Q(turno=turno_filtro) | Q(aluno__turma__turno=turno_filtro))
@@ -602,7 +604,9 @@ def _contexto_conferencia_ocorrencias(request):
     )
     turmas = Turma.objects.filter(ativa=True).order_by('turno', 'nome')
     pedagogas = (
-        RegistroOcorrenciaAluno.objects.exclude(atendido_por='')
+        RegistroOcorrenciaAluno.objects.exclude(
+            tipo_ocorrencia__in=TIPOS_OCORRENCIA_LEGADOS_FALTA
+        ).exclude(atendido_por='')
         .values_list('atendido_por', flat=True)
         .distinct()
         .order_by('atendido_por')
@@ -612,7 +616,7 @@ def _contexto_conferencia_ocorrencias(request):
         'ocorrencias': ocorrencias,
         'turmas': turmas,
         'pedagogas': pedagogas,
-        'tipos_ocorrencia': RegistroOcorrenciaAluno.TIPO_CHOICES,
+        'tipos_ocorrencia': TIPOS_OCORRENCIA_CHOICES_PERMITIDOS,
         'data_filtro': data_filtro,
         'turno_filtro': turno_filtro,
         'turma_filtro': turma_filtro,
@@ -723,7 +727,7 @@ def excluir_falta_aluno(request, falta_id):
 
 @ocorrencias_required
 def registrar_ocorrencia_aluno(request):
-    tipos_ocorrencia_permitidos = {'atraso', 'piercing', 'cabelo', 'uniforme', 'desvio_normas', 'fora_sala', 'matando_aula'}
+    tipos_ocorrencia_permitidos = TIPOS_OCORRENCIA_PERMITIDOS
 
     # Recupera ultima data da sessao
     ultima_data_str = request.session.get('ultima_data_ocorrencia')
@@ -769,9 +773,10 @@ def registrar_ocorrencia_aluno(request):
 
             ocorrencia = form.save(commit=False)
             tipo_ocorrencia = request.POST.get('tipo_ocorrencia', 'atraso')
-            tipo_normalizado = (tipo_ocorrencia or '').strip().lower()
+            tipo_normalizado = normalizar_tipo_ocorrencia(tipo_ocorrencia)
             if tipo_normalizado not in tipos_ocorrencia_permitidos:
-                tipo_normalizado = 'atraso'
+                messages.error(request, 'Tipo de ocorrencia invalido. Faltas devem ser registradas em Faltas de Alunos.')
+                return redirect('registrar_ocorrencia_aluno')
             enviar_reincidencia = request.POST.get('enviar_whatsapp_reincidencia') == 'sim'
             ocorrencia.tipo_ocorrencia = tipo_normalizado
             ocorrencia.observacoes_adicionais = request.POST.get('observacoes_adicionais', '')

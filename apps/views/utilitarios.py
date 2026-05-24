@@ -23,7 +23,9 @@ from ..models import (
 
 from ..forms import (
     RecadoInternoForm, DocumentoPrivadoForm, EventoPrivadoForm,
-    RegistroOcorrenciaForm
+    RegistroOcorrenciaForm, TIPOS_OCORRENCIA_CHOICES_PERMITIDOS,
+    TIPOS_OCORRENCIA_LEGADOS_FALTA, TIPOS_OCORRENCIA_PERMITIDOS,
+    normalizar_tipo_ocorrencia
 )
 
 # ===== NOVO IMPORT DO WHATSAPP =====

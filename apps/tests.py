@@ -1,13 +1,16 @@
 ﻿from datetime import date
 from datetime import timedelta
+from io import BytesIO, StringIO
 from types import SimpleNamespace
 from unittest.mock import patch
 
 from django.contrib.auth.models import Group, User
 from django.core import mail
+from django.core.management import call_command
 from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
+from openpyxl import load_workbook
 
 from .models import AgendamentoLab, Aluno, Laboratorio, Professor, RegistroFaltaAluno, RegistroOcorrenciaAluno, Turma
 from .services.whatsapp_service import (
@@ -95,6 +98,12 @@ class FaltasOcorrenciasSeparacaoTests(TestCase):
         )
         digitadores = Group.objects.create(name='Digitadores')
         self.user.groups.add(digitadores)
+        equipe = Group.objects.create(name='Equipe Diretiva')
+        self.equipe_user = User.objects.create_user(
+            username='equipe',
+            password='senha-teste',
+        )
+        self.equipe_user.groups.add(equipe)
 
         self.turma = Turma.objects.create(
             nome='1A',
@@ -145,7 +154,7 @@ class FaltasOcorrenciasSeparacaoTests(TestCase):
             ).exists()
         )
 
-    def test_fluxo_ocorrencia_sem_tipo_valido_nao_cai_no_default_falta(self):
+    def test_fluxo_ocorrencia_digitador_rejeita_tipo_falta(self):
         self.client.force_login(self.user)
 
         response = self.client.post(
@@ -168,15 +177,134 @@ class FaltasOcorrenciasSeparacaoTests(TestCase):
         )
 
         self.assertRedirects(response, reverse('formulario_digitador'))
-        ocorrencia = RegistroOcorrenciaAluno.objects.get(aluno=self.aluno)
-        self.assertEqual(ocorrencia.tipo_ocorrencia, 'atraso')
-        self.assertFalse(ocorrencia.faltou)
+        self.assertFalse(RegistroOcorrenciaAluno.objects.filter(aluno=self.aluno).exists())
         self.assertFalse(
             RegistroFaltaAluno.objects.filter(
                 aluno=self.aluno,
-                data=ocorrencia.data,
+                data=date(2026, 5, 15),
             ).exists()
         )
+
+    def test_fluxo_ocorrencia_real_rejeita_tipo_falta_maiusculo(self):
+        response = self._post_ocorrencia_registrar('Falta')
+
+        self.assertRedirects(response, reverse('registrar_ocorrencia_aluno'))
+        self.assertFalse(RegistroOcorrenciaAluno.objects.filter(aluno=self.aluno).exists())
+        self.assertFalse(RegistroFaltaAluno.objects.filter(aluno=self.aluno).exists())
+
+    def test_painel_nao_conta_faltas_historicas_como_ocorrencias(self):
+        self.client.force_login(self.equipe_user)
+        RegistroOcorrenciaAluno.objects.create(
+            aluno=self.aluno,
+            data=date(2026, 5, 15),
+            tipo_ocorrencia='falta',
+            faltou=True,
+            turno='manha',
+            atendido_por='Sonia',
+            registrado_por=self.user,
+        )
+        RegistroOcorrenciaAluno.objects.create(
+            aluno=self.aluno,
+            data=date(2026, 5, 15),
+            tipo_ocorrencia='Falta',
+            faltou=True,
+            turno='manha',
+            atendido_por='Sonia',
+            registrado_por=self.user,
+        )
+        RegistroOcorrenciaAluno.objects.create(
+            aluno=self.aluno,
+            data=date(2026, 5, 15),
+            tipo_ocorrencia='atraso',
+            faltou=False,
+            turno='manha',
+            atendido_por='Sonia',
+            registrado_por=self.user,
+        )
+
+        response = self.client.get(reverse('painel_equipe'), {
+            'dia': '15',
+            'mes': '5',
+            'ano': '2026',
+            'dia_ocorrencias_ranking': '15',
+            'mes_ocorrencias_ranking': '5',
+            'ano_ocorrencias_ranking': '2026',
+        })
+
+        self.assertEqual(response.context['total_ocorrencias_periodo'], 1)
+        self.assertEqual(response.context['ocorrencias_por_dia'], [1])
+        self.assertEqual(response.context['ranking_tipos_ocorrencia'], [{'tipo': 'Atraso', 'total': 1}])
+        self.assertEqual(sum(response.context['ocorrencias_totais_manha']), 1)
+        self.assertNotIn('Falta', response.context['ranking_tipos_ocorrencia_labels_json'])
+        self.assertNotIn('falta', response.context['ranking_tipos_ocorrencia_labels_json'])
+
+    def test_conferencia_ocorrencias_nao_lista_falta_no_filtro_nem_na_tabela(self):
+        self.client.force_login(self.equipe_user)
+        RegistroOcorrenciaAluno.objects.create(
+            aluno=self.aluno,
+            data=date(2026, 5, 15),
+            tipo_ocorrencia='falta',
+            faltou=True,
+            turno='manha',
+            atendido_por='Sonia',
+            registrado_por=self.user,
+        )
+        RegistroOcorrenciaAluno.objects.create(
+            aluno=self.aluno,
+            data=date(2026, 5, 15),
+            tipo_ocorrencia='atraso',
+            faltou=False,
+            turno='manha',
+            atendido_por='Sonia',
+            registrado_por=self.user,
+        )
+
+        response = self.client.get(reverse('conferencia_ocorrencias'), {'data': '2026-05-15'})
+
+        self.assertEqual(len(response.context['ocorrencias']), 1)
+        self.assertEqual(response.context['ocorrencias'][0].tipo_ocorrencia, 'atraso')
+        self.assertNotIn(('falta', 'Falta'), response.context['tipos_ocorrencia'])
+        self.assertNotContains(response, 'value="falta"')
+
+    def test_filtro_relatorio_ocorrencias_nao_oferece_falta(self):
+        self.client.force_login(self.equipe_user)
+
+        response = self.client.get(reverse('relatorio_filtro'))
+
+        self.assertNotContains(response, 'value="falta"')
+
+    def test_relatorio_ocorrencias_nao_exporta_faltas_historicas(self):
+        self.client.force_login(self.equipe_user)
+        RegistroOcorrenciaAluno.objects.create(
+            aluno=self.aluno,
+            data=date(2026, 5, 15),
+            tipo_ocorrencia='Falta',
+            faltou=True,
+            turno='manha',
+            atendido_por='Sonia',
+            registrado_por=self.user,
+        )
+        RegistroOcorrenciaAluno.objects.create(
+            aluno=self.aluno,
+            data=date(2026, 5, 15),
+            tipo_ocorrencia='atraso',
+            faltou=False,
+            turno='manha',
+            atendido_por='Sonia',
+            registrado_por=self.user,
+        )
+
+        response = self.client.get(reverse('relatorio_ocorrencias_alunos'), {'mes': '5', 'ano': '2026'})
+        workbook = load_workbook(BytesIO(response.content))
+        valores = [
+            cell
+            for row in workbook.active.iter_rows(values_only=True)
+            for cell in row
+            if cell is not None
+        ]
+
+        self.assertIn('Atraso', valores)
+        self.assertNotIn('Falta', valores)
 
     def _post_registrar_falta(self, possui_atestado='nao', follow=True):
         self.client.force_login(self.user)
@@ -557,6 +685,77 @@ class FaltasOcorrenciasSeparacaoTests(TestCase):
         self.assertEqual(enviar_mock.call_args.args[2], 'Uso de Piercing')
         self.assertContains(response, 'Novo aviso de reincidencia enviado pelo WhatsApp.')
         self.assertEqual(RegistroOcorrenciaAluno.objects.filter(aluno=self.aluno, tipo_ocorrencia='piercing').count(), 1)
+
+    def test_comando_migrar_faltas_ocorrencias_dry_run_nao_grava(self):
+        RegistroOcorrenciaAluno.objects.create(
+            aluno=self.aluno,
+            data=date(2026, 5, 16),
+            tipo_ocorrencia='falta',
+            faltou=True,
+            turno='manha',
+            atendido_por='Sonia',
+            motivo_alegado='Ausencia informada',
+            observacoes_adicionais='Observacao antiga',
+            registrado_por=self.user,
+        )
+        out = StringIO()
+
+        call_command('migrar_faltas_ocorrencias', stdout=out)
+
+        self.assertEqual(RegistroFaltaAluno.objects.count(), 0)
+        saida = out.getvalue()
+        self.assertIn('Modo: DRY-RUN', saida)
+        self.assertIn('Total encontrado: 1', saida)
+        self.assertIn('Total que sera migrado: 1', saida)
+        self.assertIn('Duplicados ignorados: 0', saida)
+
+    def test_comando_migrar_faltas_ocorrencias_confirma_e_ignora_duplicados(self):
+        outro_aluno = Aluno.objects.create(nome='Outro Aluno', numero=8, turma=self.turma)
+        RegistroFaltaAluno.objects.create(
+            aluno=self.aluno,
+            data=date(2026, 5, 16),
+            quantidade_faltas=1,
+            pedagoga='Sonia',
+            registrado_por=self.user,
+        )
+        RegistroOcorrenciaAluno.objects.create(
+            aluno=self.aluno,
+            data=date(2026, 5, 16),
+            tipo_ocorrencia='falta',
+            faltou=True,
+            turno='manha',
+            atendido_por='Sonia',
+            registrado_por=self.user,
+        )
+        RegistroOcorrenciaAluno.objects.create(
+            aluno=outro_aluno,
+            data=date(2026, 5, 17),
+            tipo_ocorrencia='Falta',
+            faltou=True,
+            turno='manha',
+            atendido_por='Simone',
+            motivo_alegado='Faltou no periodo',
+            observacoes_adicionais='Contato pendente',
+            registrado_por=self.user,
+        )
+        out = StringIO()
+
+        call_command('migrar_faltas_ocorrencias', '--confirmar', stdout=out)
+
+        self.assertEqual(RegistroFaltaAluno.objects.count(), 2)
+        falta_migrada = RegistroFaltaAluno.objects.get(aluno=outro_aluno)
+        self.assertEqual(falta_migrada.data, date(2026, 5, 17))
+        self.assertEqual(falta_migrada.pedagoga, 'Simone')
+        self.assertEqual(falta_migrada.registrado_por, self.user)
+        self.assertIn('Contato pendente', falta_migrada.observacoes)
+        self.assertIn('Faltou no periodo', falta_migrada.observacoes)
+        self.assertEqual(RegistroOcorrenciaAluno.objects.filter(tipo_ocorrencia__in=['falta', 'Falta']).count(), 2)
+
+        saida = out.getvalue()
+        self.assertIn('Total encontrado: 2', saida)
+        self.assertIn('Total que sera migrado: 1', saida)
+        self.assertIn('Duplicados ignorados: 1', saida)
+        self.assertIn('Total migrado: 1', saida)
 
 
 class WhatsAppServiceTests(TestCase):

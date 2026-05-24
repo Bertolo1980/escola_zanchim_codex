@@ -37,7 +37,10 @@ from calendar import monthrange
 from datetime import date, datetime
 from ..models import Aluno, AvisoProfessor, RegistroOcorrenciaAluno, RegistroFaltaAluno  # se ainda não estiver importado
 from ..forms import RelatorioFaltasForm
-from ..forms import RelatorioFaltasForm, RegistroOcorrenciaForm
+from ..forms import (
+    RelatorioFaltasForm, RegistroOcorrenciaForm,
+    TIPOS_OCORRENCIA_CHOICES_PERMITIDOS, TIPOS_OCORRENCIA_LEGADOS_FALTA,
+)
 from ..media_utils import garantir_pastas_media
 
 
@@ -121,6 +124,8 @@ def painel_equipe(request):
     total_justificativas_periodo = faltas_periodo.filter(justificada=True).count()
     ocorrencias_periodo = RegistroOcorrenciaAluno.objects.filter(
         data__range=(data_inicio, data_fim)
+    ).exclude(
+        tipo_ocorrencia__in=TIPOS_OCORRENCIA_LEGADOS_FALTA
     ).select_related('aluno__turma')
     total_ocorrencias_periodo = ocorrencias_periodo.count()
     total_alunos_com_ocorrencias = ocorrencias_periodo.values('aluno_id').distinct().count()
@@ -147,7 +152,7 @@ def painel_equipe(request):
         .order_by('-total', 'atendido_por')
     )
     pedagoga_top_ocorrencias = ocorrencias_por_pedagoga[0] if ocorrencias_por_pedagoga else None
-    tipos_ocorrencia_map = dict(RegistroOcorrenciaAluno.TIPO_CHOICES)
+    tipos_ocorrencia_map = dict(TIPOS_OCORRENCIA_CHOICES_PERMITIDOS)
     ranking_tipos_ocorrencia = [
         {
             'tipo': tipos_ocorrencia_map.get(item['tipo_ocorrencia'], item['tipo_ocorrencia'] or 'Nao informado'),
@@ -234,6 +239,8 @@ def painel_equipe(request):
     ocorrencias_ranking = RegistroOcorrenciaAluno.objects.filter(
         data__year=ano_ocorrencias_ranking,
         data__month=mes_ocorrencias_ranking,
+    ).exclude(
+        tipo_ocorrencia__in=TIPOS_OCORRENCIA_LEGADOS_FALTA
     ).select_related('aluno__turma')
     if dia_ocorrencias_ranking:
         ocorrencias_ranking = ocorrencias_ranking.filter(data__day=dia_ocorrencias_ranking)

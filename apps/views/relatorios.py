@@ -578,6 +578,8 @@ def relatorio_ocorrencias_alunos(request):
     ocorrencias = RegistroOcorrenciaAluno.objects.filter(
         data__month=mes,
         data__year=ano
+    ).exclude(
+        tipo_ocorrencia__in=TIPOS_OCORRENCIA_LEGADOS_FALTA
     ).select_related('aluno', 'aluno__turma').order_by('-data', '-horario_chegada')
 
     if not ocorrencias.exists():
@@ -674,17 +676,23 @@ def relatorio_ocorrencias_por_tipo(request):
 
     tipo_nomes = {
         'todas': 'Todas as ocorrÃªncias',
-        'falta': 'Falta',
         'atraso': 'Atraso',
         'piercing': 'Uso de Piercing',
         'cabelo': 'Cabelo',
         'uniforme': 'Uniforme',
         'desvio_normas': 'Desvio de Normas',
+        'fora_sala': 'Fora da sala',
+        'matando_aula': 'Matando aula',
     }
+    if tipo in TIPOS_OCORRENCIA_LEGADOS_FALTA or tipo not in tipo_nomes:
+        messages.warning(request, 'Tipo de ocorrencia invalido para relatorios de ocorrencia.')
+        return redirect('painel_equipe')
 
     ocorrencias = RegistroOcorrenciaAluno.objects.filter(
         data__month=mes,
         data__year=ano
+    ).exclude(
+        tipo_ocorrencia__in=TIPOS_OCORRENCIA_LEGADOS_FALTA
     ).select_related('aluno', 'aluno__turma').order_by('-data', '-horario_chegada')
 
     if tipo != 'todas':
